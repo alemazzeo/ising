@@ -1,10 +1,10 @@
 #include "stdlib.h"
 #include "time.h"
-
 #include "metropolis.h"
 #include "lattice.h"
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv) 
+{
   int n = 32;
   int *lattice = malloc(n * n * sizeof(int));
   float prob = 0.5;
