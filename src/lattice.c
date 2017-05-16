@@ -5,7 +5,10 @@ int fill_lattice(int *lattice, int n, float p) {
     int i, n2=n*n;
     for (i=0; i<n2; i++)
     {
-	lattice[i] = (rand()> RAND_MAX/2)*(-2) + 1 ;
+	if (RAND_MAX * p > rand())
+	    lattice[i] = 1;
+	else
+	    lattice[i] = -1;
     }
     return 0;
 }

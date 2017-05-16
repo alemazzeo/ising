@@ -1,61 +1,62 @@
 #include "metropolis.h"
 #include <stdlib.h>
-#include <math.h>
 #include <stdio.h>
 
-int metropolis(int *lattice, int n, float T) 
+int metropolis(int *lattice, int n, float T, float exp4, float exp8) 
 {
     int idx, dE;
     idx = pick_site(lattice, n);
-    flip(lattice, n, T, idx);
+    flip(lattice, n, T, exp4, exp8, idx);
     return 0;
 }
 
 int pick_site(int *lattice, int n) 
 {
-    return rand() % (n*n);
+    return (int) (((float) rand() / RAND_MAX) * n * n);
 }
 
-int flip(int *lattice, int n, float T, int idx) 
+int flip(int *lattice, int n, float T, float exp4, float exp8, int idx) 
 {
-    int idx_l, idx_u, idx_r, idx_d, dE, r, pi, n2=n*n;
+    int idx_l, idx_u, idx_r, idx_d, dE, pi;
+    int r=0, n2=n*n;
     
-    idx_l = idx - 1;
-    if (idx % n == 0) 
-	idx_l += n;
+    // Encuentra los indices de los vecinos
+    idx_l = (idx - 1) % n + (idx/n) * n;   // izquierdo
+    idx_u = (idx - n + n2) % n2;           // arriba
+    idx_r = (idx + 1) % n + (idx/n) * n;   // derecho
+    idx_d = (idx + n + n2) % n2;           // abajo
     
-    idx_u = idx - n;
-    if (idx / n == 0) 
-	idx_u += n2;
-    
-    idx_r = idx + 1;
-    if (idx % n == n-1)
-	idx_r -= n;
-
-    idx_d = idx + n;
-    if (idx / n == n-1)
-	idx_d -= n2;    
-    
-    if (lattice[idx_l] == -lattice[idx]) 
-	r++;
-    if (lattice[idx_u] == -lattice[idx]) 
-	r++;
-    if (lattice[idx_r] == -lattice[idx]) 
-	r++;
-    if (lattice[idx_d] == -lattice[idx]) 
-	r++;
+    // Calcula la cantidad de spins que se oponen
+    r+= (lattice[idx_l] * lattice[idx] +
+	 lattice[idx_u] * lattice[idx] +
+	 lattice[idx_r] * lattice[idx] +
+	 lattice[idx_d] * lattice[idx]) / 2 + 2;
 	
-    dE = (r-2) * 4;
-    pi = exp(-dE / T);
-    
-    if (pi*RAND_MAX > rand()) 
+    // Si se oponen 2 o menos
+    if (r<=2)
     {
+	// Da vuelta el spin y confirma el flip
 	lattice[idx] *= -1;
 	return 1;
     }
+    // Para 3 y 4 spins en contra (dE = 4 y 8)
     else
     {
-	return 0;
+	// Toma el valor de pi = exp(-dE/T) ya calculado
+	if (r==3)
+	    pi = exp4;
+	else
+	    pi = exp8;
+	
+	// Da vuelta el spin con probabilidad pi
+	if (pi*RAND_MAX > rand()) 
+	{
+	    lattice[idx] *= -1;
+	    return 1;
+	}
+	else
+	{
+	    return 0;
+	}
     }
 }
-
