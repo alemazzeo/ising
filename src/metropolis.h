@@ -1,6 +1,6 @@
 #ifndef METROPOLIS_H
 #define METROPOLIS_H
-int metropolis(int *lattice, int n, float *T, int *energy, int *magnet);
+int metropolis(int *lattice, int n, float *T, int pasos, int *energy, int *magnet);
 int pick_site(int *lattice, int n);
 int flip(int *lattice, int n, float *T, int idx, int *energy, int *magnet);
 int find_neighbors(int *lattice, int n, int idx, int *W, int *N, int *E, int *S);

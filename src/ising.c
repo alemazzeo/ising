@@ -11,7 +11,8 @@ int main(int argc, char **argv)
     int *lattice = malloc(n * n * sizeof(int));
     float prob=0.5;
     float T[3];
-    int niter = 10000;
+    int niter = 100;
+    int pasos = 1000;
     int E = 0;
     int M = 0;
     int nflips = 0;
@@ -33,17 +34,22 @@ int main(int argc, char **argv)
     srand(time(NULL));
     fill_lattice(lattice, n, prob);
     calc_lattice(lattice, n, &E, &M);
+    
     printf("Tamaño: %d\n", n);
     printf("Probabilidad: %f\n", prob);
     printf("Temperatura: %f\n", T[0]);
-    printf("Iteraciones: %d\n", niter);
+    printf("Iteraciones: %d x %d\n", niter, pasos);
+    
     for (int i = 0; i < niter; i++) {
-	nflips += metropolis(lattice, n, T, &E, &M);
+	nflips += metropolis(lattice, n, T, pasos, &E, &M);
     }
+    
     print_lattice(lattice, n);
+    
     printf("Energía: %d\n", E);
     printf("Magnetización: %d\n", M);
     printf("Pasos válidos: %d\n", nflips);
+    
     free(lattice);
     return 0;
 }

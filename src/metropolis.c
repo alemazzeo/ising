@@ -2,14 +2,22 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-int metropolis(int *lattice, int n, float *T, int *energy, int *magnet) 
+int metropolis(int *lattice, int n, float *T, int pasos,
+	       int *energy, int *magnet) 
 {
-    int idx;
-    // Pide la posición de un spin al azar
-    idx = pick_site(lattice, n);
-    // Trata de dar vuelta el spin
-    // Devuelve 1 si lo logra
-    return flip(lattice, n, T, idx, energy, magnet);
+    int i, idx, nflips = 0;
+
+    // Realiza el número de pasos requerido
+    for(i=0; i<pasos; i++)
+    {
+        // Pide la posición de un spin al azar
+	idx = pick_site(lattice, n);
+	// Trata de dar vuelta el spin
+	nflips += flip(lattice, n, T, idx, energy, magnet);
+    }
+    
+    // Devuelve el número de flips conseguidos
+    return nflips;
 }
 
 int pick_site(int *lattice, int n) 
