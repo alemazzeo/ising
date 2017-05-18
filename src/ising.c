@@ -12,6 +12,9 @@ int main(int argc, char **argv)
     float prob=0.5;
     float T[3];
     int niter = 10000;
+    int E = 0;
+    int M = 0;
+    int nflips = 0;
 
     T[0] = 2.0;
     
@@ -29,14 +32,18 @@ int main(int argc, char **argv)
     
     srand(time(NULL));
     fill_lattice(lattice, n, prob);
+    calc_lattice(lattice, n, &E, &M);
     printf("Tamaño: %d\n", n);
     printf("Probabilidad: %f\n", prob);
     printf("Temperatura: %f\n", T[0]);
     printf("Iteraciones: %d\n", niter);
     for (int i = 0; i < niter; i++) {
-	metropolis(lattice, n, T);
+	nflips += metropolis(lattice, n, T, &E, &M);
     }
     print_lattice(lattice, n);
+    printf("Energía: %d\n", E);
+    printf("Magnetización: %d\n", M);
+    printf("Pasos válidos: %d\n", nflips);
     free(lattice);
     return 0;
 }
