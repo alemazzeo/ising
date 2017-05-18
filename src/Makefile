@@ -3,10 +3,12 @@ CC = gcc
 
 LD = $(CC)
 
-SOURCE_C = $(wildcard *.c)
-OBJECTS_C = $(patsubst %.c, %_c.o, $(SOURCE_C))
+BIN = ../bin/
 
-CFLAGS = -std=gnu99
+SOURCE_C = $(wildcard *.c)
+OBJECTS_C = $(patsubst %.c, $(BIN)%_c.o, $(SOURCE_C))
+
+CFLAGS = -std=gnu99 -Wall
 EXECUTABLE = ../bin/ising.e
 LDFLAGS = -lm
 
@@ -27,7 +29,7 @@ executable: $(EXECUTABLE)
 
 all: objects executable
 
-%_c.o: %.c
+$(BIN)%_c.o: %.c
 	$(CC) $(CFLAGS) -c $^ -o $@
 
 %.e: $(OBJECTS_C)
