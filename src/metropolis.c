@@ -75,12 +75,12 @@ int find_neighbors(int *lattice, int n, int idx, int *W, int *N, int *E, int *S)
 
     // Condiciones periódicas de contorno
     
-    *W = (idx - 1) % n + (idx/n) * n;   // izquierda
-    *N = (idx - n + n2) % n2;           // arriba
-    *E = (idx + 1) % n + (idx/n) * n;   // derecha
-    *S = (idx + n + n2) % n2;           // abajo
+    *W = (idx - 1 + n) % n + (idx/n) * n;   // izquierda
+    *N = (idx - n + n2) % n2;               // arriba
+    *E = (idx + 1 + n) % n + (idx/n) * n;   // derecha
+    *S = (idx + n + n2) % n2;               // abajo
 
-    // (idx +/- 1) % n ---------> se mueve de columna
+    // (idx +/- 1 + n) % n -----> se mueve de columna
     // (idx/n) * n -------------> primer elemento de la fila
     // (idx +/- n + n2) % n2 ---> se mueve de fila
 
