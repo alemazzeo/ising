@@ -253,3 +253,16 @@ class lattice():
         self._mask[E] = False
         self._mask[S] = False
         self._refresh()
+
+    def autocorrelate(x):
+        fftx = npfft.fft(x)
+        fftx_mean = np.mean(fftx)
+        fftx_std = np.std(fftx)
+
+        ffty = np.conjugate(fftx)
+        ffty_mean = np.mean(ffty)
+        ffty_std = np.std(ffty)
+
+        result = np.fft.ifft((fftx - fftx_mean) * (ffty - ffty_mean))
+        result = np.fft.fftshift(result)
+        return [i / (fftx_std * ffty_std) for i in result.real]

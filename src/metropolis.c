@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 int metropolis(int *lattice, int n, float *T, int pasos,
-	       int *energy, int *magnet) 
+	       int *energy, int *magnet)
 {
     int i, idx, nflips = 0;
 
@@ -15,29 +15,29 @@ int metropolis(int *lattice, int n, float *T, int pasos,
 	// Trata de dar vuelta el spin
 	nflips += flip(lattice, n, T, idx, energy, magnet);
     }
-    
+
     // Devuelve el número de flips conseguidos
     return nflips;
 }
 
-int pick_site(int *lattice, int n) 
+int pick_site(int *lattice, int n)
 {
     // Elige un spin al azar y devuelve su posición
     return (int) (((float) rand() / RAND_MAX) * n * n);
 }
 
-int flip(int *lattice, int n, float *T, int idx, int *energy, int *magnet) 
+int flip(int *lattice, int n, float *T, int idx, int *energy, int *magnet)
 {
     int W, N, E, S;
     int opposites;
     float pi;
-    
+
     // Busca los indices de los vecinos
     find_neighbors(lattice, n, idx, &W, &N, &E, &S);
-    
+
     // Cuenta los spins en contra (costo del flip)
     opposites = cost(lattice, n, idx, &W, &N, &E, &S);
-	
+
     // Si el flip no aumenta la energía (2 o menos en contra)
     if (opposites<=2)
     {
@@ -53,9 +53,9 @@ int flip(int *lattice, int n, float *T, int idx, int *energy, int *magnet)
 	// T[1] = exp(-4/T)
 	// T[2] = exp(-8/T)
 	pi = T[opposites - 2];
-	
+
 	// Da vuelta el spin con probabilidad pi e informa
-	if (pi*RAND_MAX > rand()) 
+	if (pi*RAND_MAX > rand())
 	{
 	    // Acepta el flip. Actualiza E y M
 	    accept_flip(lattice, n, idx, opposites, energy, magnet);
@@ -74,7 +74,7 @@ int find_neighbors(int *lattice, int n, int idx, int *W, int *N, int *E, int *S)
     int n2 = n*n;
 
     // Condiciones periódicas de contorno
-    
+
     *W = (idx - 1 + n) % n + (idx/n) * n;   // izquierda
     *N = (idx - n + n2) % n2;               // arriba
     *E = (idx + 1 + n) % n + (idx/n) * n;   // derecha
@@ -91,7 +91,7 @@ int cost(int *lattice, int n, int idx, int *W, int *N, int *E, int *S)
 {
     // Cuenta los spins en contra (costo del flip)
 
-    // (4, 2, 0, -2, 4) / 2 + 2 --> (4, 3, 2, 1, 0)       
+    // (4, 2, 0, -2, 4) / 2 + 2 --> (4, 3, 2, 1, 0)
     return (lattice[*W] * lattice[idx] +
 	    lattice[*N] * lattice[idx] +
 	    lattice[*E] * lattice[idx] +
