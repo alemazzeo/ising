@@ -1,5 +1,17 @@
 #ifndef METROPOLIS_H
 #define METROPOLIS_H
+
+struct _lat
+{
+    int *lattice;
+    int n;
+    float T, J, B;
+    int W, N, E, S;
+    int *energy, *magnet;
+};
+
+typedef struct _lat Lattice;
+
 int metropolis(int *lattice, int n, float *T, int pasos, int *energy, int *magnet);
 int pick_site(int *lattice, int n);
 int flip(int *lattice, int n, float *T, int idx, int *energy, int *magnet);
