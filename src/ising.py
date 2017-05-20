@@ -33,11 +33,23 @@ class lattice():
         self._list_M = list()
         self._list_C = list()
 
+        # Figura principal
         self._fig = None
+        # Subplot lattice
+        self._subp_lattice = None
+        # Dibujo de la matriz
         self._draw = None
+        # Flag de vista activa
         self._active_view = False
+        # Ultimo spin seleccionado
         self._current_idx = -1
+        # Flag de modo test
         self._test_mode = False
+        # Máscara para vecinos y valor
+        self._mask_v = 5
+        self._mask = np.zeros(self._n**2, dtype=bool)
+        # Diccionario de eventos conectados
+        self._events = dict()
 
     def run(self, niter=1000):
 
@@ -113,7 +125,7 @@ class lattice():
                 C.c_int(idx),
                 C.c_int(opposites),
                 C.byref(self._current_E),
-                C.byref(self._current_M))                
+                C.byref(self._current_M))
         self._lib.accept_flip(*args)
         self._refresh()
 
@@ -136,16 +148,14 @@ class lattice():
             plt.ion()
             # Almacena el objeto figura
             self._fig = plt.figure()
+            # Almacena el subplot para lattice
+            self._subp_lattice = self._fig.add_subplot(111)
             # Transforma el array en matriz
             aux = self._reshape()
             # Almacena el objeto dibujo
-            self._draw = self._fig.add_subplot(111).matshow(aux, 
-                                                            cmap='gray',
-                                                            picker=1)
-            # Setea los valores máximo y minimo (evita que se haga solo)
-            self._draw.set_clim(vmin=-1, vmax=1)
+            self._draw = self._subp_lattice.matshow(aux, cmap='gray')
             # Configura una función para detectar el cierre de la ventana
-            self._ventana_interactiva()
+            self._connect_event('close_event')
             # Actualiza
             self._active_view = True
             self._refresh()
@@ -158,36 +168,88 @@ class lattice():
     def _reshape(self):
         # Copia el array 1D y lo transforma en matriz
         aux = np.copy(self._lattice).astype(int)
+        if self._test_mode:
+            # Aplica la máscara
+            aux[self._mask] *= self._mask_v
         aux = aux.reshape(self._n, self._n)
         return aux
-
-    def _ventana_interactiva(self):
-        # Configura una función para detectar el cierre de la ventana
-        self._fig.canvas.mpl_connect('close_event', 
-                                     self._close_view)
-        # Configura una función para detectar los clicks
-        self._fig.canvas.mpl_connect('pick_event', 
-                                     self._onpick)
-
-    def _close_view(self, evt):
-        # Detecta el cierre de la ventana
-        self._active_view = False
-
-    def _onpick(self, evt):
-        self._current_idx = evt.ind
 
     def _refresh(self):
         # Verifica que exista una ventana abierta
         if self._active_view:
             # Transforma el array en matriz
             aux = self._reshape()
+
+            # Para el modo test
+            if self._test_mode:
+                # Setea los valores máximo y minimo
+                self._draw.set_clim(vmin=-self._mask_v, vmax=self._mask_v)
+            else:
+                # Setea los valores máximo y minimo
+                self._draw.set_clim(vmin=-1, vmax=1)
+
             # Actualiza el dibujo
             self._draw.set_array(aux)
             plt.draw()
 
-    def test(self):
+    def test(self, active=True):
         if not self._active_view:
             self.view()
-        self._test_mode = True
-        
-            
+        self._test_mode = active
+
+        if active:
+            self._connect_event('button_press_event')
+            self._connect_event('motion_notify_event')
+        else:
+            self._disconnect_event('button_press_event')
+            self._disconnect_event('motion_notify_event')
+            self._refresh()
+
+    def _connect_event(self, *args, **kargs):
+        # Eventos y funciones correspondientes por defecto
+        events = {'close_event': self._close_view,
+                  'button_press_event': self._onclick,
+                  'motion_notify_event': self._onmotion}
+
+        # Casos donde recibe solo el nombre del evento
+        for element in args:
+            event = element
+            function = events[event]
+            self._events[event] = self._fig.canvas.mpl_connect(event, function)
+
+        # Casos donde recibe el evento y una nueva función a ejecutar
+        for event, function in kargs.items():
+            self._events[event] = self._fig.canvas.mpl_connect(event, function)
+
+    def _disconnect_event(self, *args):
+        for event in args:
+            event_id = self._events[event]
+            self._fig.canvas.mpl_disconnect(event_id)
+
+    def _close_view(self, evt):
+        # Detecta el cierre de la ventana
+        self._active_view = False
+
+    def _onclick(self, evt):
+        if evt.button == 1:
+            self._current_idx = int(evt.xdata+0.5) + int(evt.ydata+0.5) * self._n
+            self.accept_flip(self._current_idx)
+        elif evt.button == 3:
+            self._current_idx = int(evt.xdata+0.5) + int(evt.ydata+0.5) * self._n
+            cost = self.cost(self._current_idx)
+            energy = self.calc_energy(self._current_idx)
+            magnet = self.calc_magnet(self._current_idx)
+            print('cost:   ' + str(cost))
+            print('energy: ' + str(energy))
+            print('magnet: ' + str(magnet))
+
+    def _onmotion(self, evt):
+        self._mask = np.ones(self._n**2, dtype=bool)
+        if evt.inaxes != self._draw.axes: return
+        idx = int(evt.xdata+0.5) + int(evt.ydata+0.5) * self._n
+        W, N, E, S = self.find_neighbors(idx, ctype=False)
+        self._mask[W] = False
+        self._mask[N] = False
+        self._mask[E] = False
+        self._mask[S] = False
+        self._refresh()

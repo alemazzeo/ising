@@ -115,7 +115,7 @@ int calc_energy(int *lattice, int n, int idx)
     // Identifica los vecinos
     find_neighbors(lattice, n, idx, &W, &N, &E, &S);
     // Aprovecha la función cost para calcular la energía
-    return cost(lattice, n, idx, &W, &N, &E, &S) + 2 * (-2);
+    return (cost(lattice, n, idx, &W, &N, &E, &S) - 2) * (-2);
 }
 
 int calc_magnet(int *lattice, int n, int idx)
