@@ -1,15 +1,29 @@
 import numpy as np
 import ctypes as C
 import matplotlib.pyplot as plt
-import time
-import threading
-import os
+#import time
+#import threading
+#import os
 
-class lattice():
+class Lattice(C.Structure):
+    _fields_ = [("_p_lattice",C.POINTER(C.c_int)),
+                ("_n", C.c_int),
+                ("_n2", C.c_int),
+                ("_total_flips", C.c_int),
+                ("_T", C.c_float),
+                ("_J", C.c_float),
+                ("_N", C.c_float),
+                ("_exps",C.POINTER(C.c_float)),
+                ("_W", C.c_int),
+                ("_N", C.c_int),
+                ("_E", C.c_int),
+                ("_S", C.c_int),
+                ("_opposites", C.c_int),
+                ("_p_energy",C.POINTER(C.c_int)),
+                ("_p_magnet",C.POINTER(C.c_int))]
 
     def __init__(self, n, data='../datos/', lib='./libising.so'):
-        # Tamaño de la red
-        self._n = n
+
         # Origen de datos
         self._data = data
 
@@ -17,17 +31,18 @@ class lattice():
         self._lib = C.CDLL(lib)
 
         # Memoria asignada a la red
-        self._lattice = np.ones(self._n**2, dtype=C.c_int)
+        self._lattice = np.ones(n**2, dtype=C.c_int)
+        self._p_lattice = self._lattice.ctypes.data_as(C.POINTER(C.c_int))
+        self._energy = C.c_int(0)
+        self._p_energy = C.pointer(self._energy)
+        self._magnet = C.c_int(0)
+        self._p_magnet = C.pointer(self._magnet)
 
-        # Memoria asignada a los valores actuales
-        self._iter = 0
-        self._current_T = 2.0
-        self._current_E = C.c_int(0)
-        self._current_M = C.c_int(0)
-        self._current_C = C.c_float(0.0)
+        # Inicializa los valores
+        self._lib.init(C.pointer(self), n)
+        self.calc_lattice()
 
         # Lista de valores obtenidos (para graficar)
-        self._list_iter = list()
         self._list_T = list()
         self._list_E = list()
         self._list_M = list()
@@ -49,27 +64,13 @@ class lattice():
         self._mask_v = 5
         self._mask = np.zeros(self._n**2, dtype=bool)
         # Diccionario de eventos conectados
-        self._events = dict()
+        self._events = {'close_event': None,
+                        'button_press_event': None,
+                        'motion_notify_event': None}
 
     def run(self, niter=1000):
-
-        # Calcula las exponenciales para la T configurada
-        T = self._current_T
-        T_table = np.array([T, np.exp(-4/T), np.exp(-8/T)], dtype=C.c_float)
-
-        # Prepara los argumentos que recibe la función
-        args = (self._lattice.ctypes.data_as(C.POINTER(C.c_int)),
-                C.c_int(self._n),
-                T_table.ctypes.data_as(C.POINTER(C.c_float)),
-                C.c_int(niter),
-                C.byref(self._current_E),
-                C.byref(self._current_M))
-
         # Llama a la función metropolis
-        # int metropolis(int *lattice, int n, float *T, int pasos,
-        #                int *energy, int *magnet);
-        nflips = self._lib.metropolis(*args)
-
+        nflips = self._lib.metropolis(C.pointer(self), C.c_int(niter))
         # Actualiza
         self._refresh()
         # Devuelve los pasos aceptados
@@ -84,62 +85,30 @@ class lattice():
         self._refresh()
 
     def pick_site(self):
-        args = (self._lattice.ctypes.data_as(C.POINTER(C.c_int)),
-                C.c_int(self._n))
-        site = self._lib.pick_site(*args)
+        site = self._lib.pick_site(C.pointer(self))
         return site
 
-    def find_neighbors(self, idx, ctype=False):
-        W = C.c_int(0)
-        N = C.c_int(0)
-        E = C.c_int(0)
-        S = C.c_int(0)
-        args = (self._lattice.ctypes.data_as(C.POINTER(C.c_int)),
-                C.c_int(self._n),
-                C.c_int(idx),
-                C.byref(W),
-                C.byref(N),
-                C.byref(E),
-                C.byref(S))
-        self._lib.find_neighbors(*args)
-        if ctype:
-            return W, N, E, S
-        else:
-            return W.value, N.value, E.value, S.value
+    def find_neighbors(self, idx):
+        self._lib.find_neighbors(C.pointer(self), C.c_int(idx))
+        return self._W, self._N, self._E, self._S
 
     def cost(self, idx):
-        W, N, E, S = self.find_neighbors(idx, ctype=True)
-        args = (self._lattice.ctypes.data_as(C.POINTER(C.c_int)),
-                C.c_int(self._n),
-                C.c_int(idx),
-                C.byref(W),
-                C.byref(N),
-                C.byref(E),
-                C.byref(S))
-        return self._lib.cost(*args)
+        self.find_neighbors(idx)
+        return self._lib.cost(C.pointer(self), idx)
 
     def accept_flip(self, idx):
         opposites = self.cost(idx)
-        args = (self._lattice.ctypes.data_as(C.POINTER(C.c_int)),
-                C.c_int(self._n),
-                C.c_int(idx),
-                C.c_int(opposites),
-                C.byref(self._current_E),
-                C.byref(self._current_M))
-        self._lib.accept_flip(*args)
+        self._lib.accept_flip(C.pointer(self), C.c_int(idx), C.c_int(opposites))
         self._refresh()
 
     def calc_energy(self, idx):
-        args = (self._lattice.ctypes.data_as(C.POINTER(C.c_int)),
-                C.c_int(self._n),
-                C.c_int(idx))
-        return self._lib.calc_energy(*args)
+        return self._lib.calc_energy(C.pointer(self), C.c_int(idx))
 
     def calc_magnet(self, idx):
-        args = (self._lattice.ctypes.data_as(C.POINTER(C.c_int)),
-                C.c_int(self._n),
-                C.c_int(idx))
-        return self._lib.calc_magnet(*args)
+        return self._lib.calc_magnet(C.pointer(self), C.c_int(idx))
+
+    def calc_lattice(self):
+        self._lib.calc_lattice(C.pointer(self))
 
     def view(self, lattice=True, energy=True, magnet=True, temp=True):
         # Si la vista no fue creada
@@ -207,14 +176,15 @@ class lattice():
 
     def _connect_event(self, *args, **kargs):
         # Eventos y funciones correspondientes por defecto
-        events = {'close_event': self._close_view,
-                  'button_press_event': self._onclick,
-                  'motion_notify_event': self._onmotion}
+        events = {'close_event': lambda evt: self._close_view(evt),
+                  'button_press_event': lambda evt: self._onclick(evt),
+                  'motion_notify_event': lambda evt: self._onmotion(evt)}
 
         # Casos donde recibe solo el nombre del evento
         for element in args:
             event = element
             function = events[event]
+            self._fig.canvas.mpl_connect(event, function)
             self._events[event] = self._fig.canvas.mpl_connect(event, function)
 
         # Casos donde recibe el evento y una nueva función a ejecutar
@@ -247,7 +217,7 @@ class lattice():
         self._mask = np.ones(self._n**2, dtype=bool)
         if evt.inaxes != self._draw.axes: return
         idx = int(evt.xdata+0.5) + int(evt.ydata+0.5) * self._n
-        W, N, E, S = self.find_neighbors(idx, ctype=False)
+        W, N, E, S = self.find_neighbors(idx)
         self._mask[W] = False
         self._mask[N] = False
         self._mask[E] = False

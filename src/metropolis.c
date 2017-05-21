@@ -5,37 +5,39 @@
 
 int init(Lattice *self, int n)
 {
-    self -> n = n;
-    self -> n2 = n * n;
-    self -> total_flips = 0;
-    self -> T = 2.0;
-    self -> J = 1;
-    self -> B = 0;
-    self -> opposites = 0;
-    *(self -> energy) = 0;
-    *(self -> magnet) = 0;
+    self -> _n = n;
+    self -> _n2 = n * n;
+    self -> _total_flips = 0;
+    self -> _T = 2.0;
+    self -> _J = 1;
+    self -> _B = 0;
+    self -> _exps[0] = exp(-4 / self -> _T);
+    self -> _exps[1] = exp(-8 / self -> _T);
+    self -> _opposites = 0;
+    *(self -> _p_energy) = 0;
+    *(self -> _p_magnet) = 0;
     return 0;
 }
 
 int set(Lattice *self, float T, float J, float B)
 {
-    self -> T = T;
-    self -> J = J;
-    self -> B = B;
-    self -> exps[0] = exp(-4/T);
-    self -> exps[1] = exp(-8/T);
+    self -> _T = T;
+    self -> _J = J;
+    self -> _B = B;
+    self -> _exps[0] = exp(-4/T);
+    self -> _exps[1] = exp(-8/T);
     return 0;
 }
 
 int info(Lattice *self)
 {
-    printf("Size: %d\n", self -> n);
-    printf("T: %f\n", self -> T);
-    printf("J: %f\n", self -> J);
-    printf("B: %f\n", self -> B);
-    printf("Energy: %d\n", *(self -> energy));
-    printf("Magnetization: %d\n", *(self -> magnet));
-    printf("Number of flips: %d\n", self -> total_flips);
+    printf("Size: %d\n", self -> _n);
+    printf("T: %f\n", self -> _T);
+    printf("J: %f\n", self -> _J);
+    printf("B: %f\n", self -> _B);
+    printf("Energy: %d\n", *(self -> _p_energy));
+    printf("Magnetization: %d\n", *(self -> _p_magnet));
+    printf("Number of flips: %d\n", self -> _total_flips);
     return 0;
 }
 
@@ -51,7 +53,7 @@ int metropolis(Lattice *self, int pasos)
 	// Trata de dar vuelta el spin
 	nflips += flip(self, idx);
     }
-    self -> total_flips += nflips;
+    self -> _total_flips += nflips;
     // Devuelve el número de flips conseguidos
     return nflips;
 }
@@ -59,7 +61,7 @@ int metropolis(Lattice *self, int pasos)
 int pick_site(Lattice *self)
 {
     // Elige un spin al azar y devuelve su posición
-    return (int) (((float) rand() / RAND_MAX) * (self -> n2));
+    return (int) (((float) rand() / RAND_MAX) * (self -> _n2));
 }
 
 int flip(Lattice *self, int idx)
@@ -87,7 +89,7 @@ int flip(Lattice *self, int idx)
 	// T[0] = [temperatura]
 	// T[1] = exp(-4/T)
 	// T[2] = exp(-8/T)
-	pi = self -> exps[opposites - 3];
+	pi = self -> _exps[opposites - 3];
 
 	// Da vuelta el spin con probabilidad pi e informa
 	if (pi*RAND_MAX > rand())
@@ -108,14 +110,14 @@ int find_neighbors(Lattice *self, int idx)
 {
 
     int n, n2;
-    n = self -> n;
-    n2 = self -> n2;
+    n = self -> _n;
+    n2 = self -> _n2;
 
     // Condiciones periódicas de contorno
-    self -> W = (idx - 1 + n) % n + (idx/n) * n;   // izquierda
-    self -> N = (idx - n + n2) % n2;               // arriba
-    self -> E = (idx + 1 + n) % n + (idx/n) * n;   // derecha
-    self -> S = (idx + n + n2) % n2;               // abajo
+    self -> _W = (idx - 1 + n) % n + (idx/n) * n;   // izquierda
+    self -> _N = (idx - n + n2) % n2;               // arriba
+    self -> _E = (idx + 1 + n) % n + (idx/n) * n;   // derecha
+    self -> _S = (idx + n + n2) % n2;               // abajo
 
     // (idx +/- 1 + n) % n -----> se mueve de columna
     // (idx/n) * n -------------> primer elemento de la fila
@@ -129,20 +131,26 @@ int cost(Lattice *self, int idx)
     // Cuenta los spins en contra (costo del flip)
 
     // (4, 2, 0, -2, 4) / 2 + 2 --> (4, 3, 2, 1, 0)
-    return ((self -> lattice[self -> W]) * (self -> lattice[idx]) +
-    	    (self -> lattice[self -> N]) * (self -> lattice[idx]) +
-	    (self -> lattice[self -> E]) * (self -> lattice[idx]) +
-	    (self -> lattice[self -> S]) * (self -> lattice[idx])) / 2 + 2;
+    self -> _opposites = ((self -> _p_lattice[self -> _W]) *
+			  (self -> _p_lattice[idx]) +
+			  (self -> _p_lattice[self -> _N]) *
+			  (self -> _p_lattice[idx]) +
+			  (self -> _p_lattice[self -> _E]) *
+			  (self -> _p_lattice[idx]) +
+			  (self -> _p_lattice[self -> _S]) *
+			  (self -> _p_lattice[idx])) / 2 + 2;
+
+    return self -> _opposites;
 }
 
 int accept_flip(Lattice *self, int idx, int opposites)
 {
     // Realiza el flip
-    self -> lattice[idx] *= -1;
+    self -> _p_lattice[idx] *= -1;
     // Actualiza la energía
-    *(self -> energy) += ((opposites - 2) * 4);
+    *(self -> _p_energy) += ((opposites - 2) * 4);
     // Actualiza la magnetización
-    *(self -> magnet) += ((self -> lattice[idx]) * 2);
+    *(self -> _p_magnet) += ((self -> _p_lattice[idx]) * 2);
     return 0;
 }
 
@@ -157,7 +165,7 @@ int calc_energy(Lattice *self, int idx)
 int calc_magnet(Lattice *self, int idx)
 {
     // Devuelve el valor del spin para calcular la magnetización
-    return self -> lattice[idx];
+    return self -> _p_lattice[idx];
 }
 
 int calc_lattice(Lattice *self)
@@ -165,14 +173,14 @@ int calc_lattice(Lattice *self)
     int i;
 
     // Resetea E y M
-    *(self -> energy) = 0;
-	*(self -> magnet) = 0;
+    *(self -> _p_energy) = 0;
+	*(self -> _p_magnet) = 0;
 
     // Recorre la red actualizando los valores de E y M
-    for (i=0; i< self->n2; i++)
+    for (i=0; i< self->_n2; i++)
     {
-		*(self -> energy) += calc_energy(self, i);
-		*(self -> magnet) += calc_magnet(self, i);
+		*(self -> _p_energy) += calc_energy(self, i);
+		*(self -> _p_magnet) += calc_magnet(self, i);
     }
     return 0;
 }

@@ -31,14 +31,14 @@ int main(int argc, char **argv)
     srand(time(NULL));
 
     ising = malloc(sizeof(Lattice));
-    ising -> lattice = malloc(n*n*sizeof(int));
-	ising -> energy = malloc(sizeof(int));
-	ising -> magnet = malloc(sizeof(int));
+    ising -> _p_lattice = malloc(n*n*sizeof(int));
+	ising -> _p_energy = malloc(sizeof(int));
+	ising -> _p_magnet = malloc(sizeof(int));
 
     init(ising, n);
     set(ising, T, J, B);
 
-    fill_lattice(ising -> lattice, n, prob);
+    fill_lattice(ising -> _p_lattice, n, prob);
     calc_lattice(ising);
 
     printf("Iteraciones: %d x %d\n", niter, pasos);
@@ -47,13 +47,13 @@ int main(int argc, char **argv)
 		metropolis(ising, pasos);
     }
 
-    print_lattice(ising -> lattice, n);
+    print_lattice(ising -> _p_lattice, n);
     printf("\n");
     info(ising);
 
-	free(ising -> lattice);
-	free(ising -> energy);
-	free(ising -> magnet);
+	free(ising -> _p_lattice);
+	free(ising -> _p_energy);
+	free(ising -> _p_magnet);
 	free(ising);
 
     return 0;

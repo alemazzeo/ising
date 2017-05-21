@@ -3,15 +3,15 @@
 
 struct _lat
 {
-    int *lattice;
-    int n;
-    int n2;
-    int total_flips;
-    float T, J, B;
-    float exps[2];
-    int W, N, E, S;
-    int opposites;
-    int *energy, *magnet;
+    int *_p_lattice;
+    int _n;
+    int _n2;
+    int _total_flips;
+    float _T, _J, _B;
+    float _exps[2];
+    int _W, _N, _E, _S;
+    int _opposites;
+    int *_p_energy, *_p_magnet;
 };
 
 typedef struct _lat Lattice;
