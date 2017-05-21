@@ -12,13 +12,13 @@ int main(int argc, char **argv)
     int n = 32;
 
     float prob=0.5;
-    int niter = 100;
+    int niter = 1000;
     int pasos = 1000;
 
     float T = 2.0;
     float J = 1.0;
     float B = 0.0;
-/*
+
     if (argc > 1)
     {
 	T = atof(argv[1]);
@@ -27,7 +27,7 @@ int main(int argc, char **argv)
 	    niter = atoi(argv[2]);
 	}
     }
-*/
+
     srand(time(NULL));
 
     ising = malloc(sizeof(Lattice));
