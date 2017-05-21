@@ -5,20 +5,27 @@ struct _lat
 {
     int *lattice;
     int n;
+    int n2;
+    int total_flips;
     float T, J, B;
+    float exps[2];
     int W, N, E, S;
+    int opposites;
     int *energy, *magnet;
 };
 
 typedef struct _lat Lattice;
 
-int metropolis(int *lattice, int n, float *T, int pasos, int *energy, int *magnet);
-int pick_site(int *lattice, int n);
-int flip(int *lattice, int n, float *T, int idx, int *energy, int *magnet);
-int find_neighbors(int *lattice, int n, int idx, int *W, int *N, int *E, int *S);
-int cost(int *lattice, int n, int idx, int *W, int *N, int *E, int *S);
-int accept_flip(int *lattice, int n, int idx, int opposites, int *energy, int *magnet);
-int calc_energy(int *lattice, int n, int idx);
-int calc_energy(int *lattice, int n, int idx);
-int calc_lattice(int *lattice, int n, int *energy, int *magnet);
+int init(Lattice *self, int n);
+int set(Lattice *self, float T, float J, float B);
+int info(Lattice *self);
+int metropolis(Lattice *self, int pasos);
+int pick_site(Lattice *self);
+int flip(Lattice *self, int idx);
+int find_neighbors(Lattice *self, int idx);
+int cost(Lattice *self, int idx);
+int accept_flip(Lattice *self, int idx, int opposites);
+int calc_energy(Lattice *self, int idx);
+int calc_energy(Lattice *self, int idx);
+int calc_lattice(Lattice *self);
 #endif

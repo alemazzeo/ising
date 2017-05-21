@@ -1,9 +1,45 @@
 #include "metropolis.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 
-int metropolis(int *lattice, int n, float *T, int pasos,
-	       int *energy, int *magnet)
+int init(Lattice *self, int n)
+{
+    self -> n = n;
+    self -> n2 = n * n;
+    self -> total_flips = 0;
+    self -> T = 2.0;
+    self -> J = 1;
+    self -> B = 0;
+    self -> opposites = 0;
+    *(self -> energy) = 0;
+    *(self -> magnet) = 0;
+    return 0;
+}
+
+int set(Lattice *self, float T, float J, float B)
+{
+    self -> T = T;
+    self -> J = J;
+    self -> B = B;
+    self -> exps[0] = exp(-4/T);
+    self -> exps[1] = exp(-8/T);
+    return 0;
+}
+
+int info(Lattice *self)
+{
+    printf("Size: %d\n", self -> n);
+    printf("T: %f\n", self -> T);
+    printf("J: %f\n", self -> J);
+    printf("B: %f\n", self -> B);
+    printf("Energy: %d\n", *(self -> energy));
+    printf("Magnetization: %d\n", *(self -> magnet));
+    printf("Number of flips: %d\n", self -> total_flips);
+    return 0;
+}
+
+int metropolis(Lattice *self, int pasos)
 {
     int i, idx, nflips = 0;
 
@@ -11,38 +47,37 @@ int metropolis(int *lattice, int n, float *T, int pasos,
     for(i=0; i<pasos; i++)
     {
         // Pide la posición de un spin al azar
-	idx = pick_site(lattice, n);
+	idx = pick_site(self);
 	// Trata de dar vuelta el spin
-	nflips += flip(lattice, n, T, idx, energy, magnet);
+	nflips += flip(self, idx);
     }
-
+    self -> total_flips += nflips;
     // Devuelve el número de flips conseguidos
     return nflips;
 }
 
-int pick_site(int *lattice, int n)
+int pick_site(Lattice *self)
 {
     // Elige un spin al azar y devuelve su posición
-    return (int) (((float) rand() / RAND_MAX) * n * n);
+    return (int) (((float) rand() / RAND_MAX) * (self -> n2));
 }
 
-int flip(int *lattice, int n, float *T, int idx, int *energy, int *magnet)
+int flip(Lattice *self, int idx)
 {
-    int W, N, E, S;
     int opposites;
     float pi;
 
     // Busca los indices de los vecinos
-    find_neighbors(lattice, n, idx, &W, &N, &E, &S);
+    find_neighbors(self, idx);
 
     // Cuenta los spins en contra (costo del flip)
-    opposites = cost(lattice, n, idx, &W, &N, &E, &S);
+    opposites = cost(self, idx);
 
     // Si el flip no aumenta la energía (2 o menos en contra)
     if (opposites<=2)
     {
 	// Acepta el flip. Actualiza E y M
-	accept_flip(lattice, n, idx, opposites, energy, magnet);
+	accept_flip(self, idx, opposites);
 	return 1;
     }
     // En otro caso (dE = 4 y 8)
@@ -52,13 +87,13 @@ int flip(int *lattice, int n, float *T, int idx, int *energy, int *magnet)
 	// T[0] = [temperatura]
 	// T[1] = exp(-4/T)
 	// T[2] = exp(-8/T)
-	pi = T[opposites - 2];
+	pi = self -> exps[opposites - 3];
 
 	// Da vuelta el spin con probabilidad pi e informa
 	if (pi*RAND_MAX > rand())
 	{
 	    // Acepta el flip. Actualiza E y M
-	    accept_flip(lattice, n, idx, opposites, energy, magnet);
+	    accept_flip(self, idx, opposites);
 	    return 1;
 	}
 	else
@@ -69,16 +104,18 @@ int flip(int *lattice, int n, float *T, int idx, int *energy, int *magnet)
 }
 
 
-int find_neighbors(int *lattice, int n, int idx, int *W, int *N, int *E, int *S)
+int find_neighbors(Lattice *self, int idx)
 {
-    int n2 = n*n;
+
+    int n, n2;
+    n = self -> n;
+    n2 = self -> n2;
 
     // Condiciones periódicas de contorno
-
-    *W = (idx - 1 + n) % n + (idx/n) * n;   // izquierda
-    *N = (idx - n + n2) % n2;               // arriba
-    *E = (idx + 1 + n) % n + (idx/n) * n;   // derecha
-    *S = (idx + n + n2) % n2;               // abajo
+    self -> W = (idx - 1 + n) % n + (idx/n) * n;   // izquierda
+    self -> N = (idx - n + n2) % n2;               // arriba
+    self -> E = (idx + 1 + n) % n + (idx/n) * n;   // derecha
+    self -> S = (idx + n + n2) % n2;               // abajo
 
     // (idx +/- 1 + n) % n -----> se mueve de columna
     // (idx/n) * n -------------> primer elemento de la fila
@@ -87,56 +124,55 @@ int find_neighbors(int *lattice, int n, int idx, int *W, int *N, int *E, int *S)
     return 0;
 }
 
-int cost(int *lattice, int n, int idx, int *W, int *N, int *E, int *S)
+int cost(Lattice *self, int idx)
 {
     // Cuenta los spins en contra (costo del flip)
 
     // (4, 2, 0, -2, 4) / 2 + 2 --> (4, 3, 2, 1, 0)
-    return (lattice[*W] * lattice[idx] +
-	    lattice[*N] * lattice[idx] +
-	    lattice[*E] * lattice[idx] +
-	    lattice[*S] * lattice[idx]) / 2 + 2;
+    return ((self -> lattice[self -> W]) * (self -> lattice[idx]) +
+    	    (self -> lattice[self -> N]) * (self -> lattice[idx]) +
+	    (self -> lattice[self -> E]) * (self -> lattice[idx]) +
+	    (self -> lattice[self -> S]) * (self -> lattice[idx])) / 2 + 2;
 }
 
-int accept_flip(int *lattice, int n, int idx, int opposites, int *energy, int *magnet)
+int accept_flip(Lattice *self, int idx, int opposites)
 {
     // Realiza el flip
-    lattice[idx] *= -1;
+    self -> lattice[idx] *= -1;
     // Actualiza la energía
-    *energy = *energy + ((opposites - 2) * 4);
+    *(self -> energy) += ((opposites - 2) * 4);
     // Actualiza la magnetización
-    *magnet = *magnet + (lattice[idx] * 2);
+    *(self -> magnet) += ((self -> lattice[idx]) * 2);
     return 0;
 }
 
-int calc_energy(int *lattice, int n, int idx)
+int calc_energy(Lattice *self, int idx)
 {
-    int W, N, E, S;
     // Identifica los vecinos
-    find_neighbors(lattice, n, idx, &W, &N, &E, &S);
+    find_neighbors(self, idx);
     // Aprovecha la función cost para calcular la energía
-    return (cost(lattice, n, idx, &W, &N, &E, &S) - 2) * (-2);
+    return (cost(self, idx) - 2) * (-2);
 }
 
-int calc_magnet(int *lattice, int n, int idx)
+int calc_magnet(Lattice *self, int idx)
 {
     // Devuelve el valor del spin para calcular la magnetización
-    return lattice[idx];
+    return self -> lattice[idx];
 }
 
-int calc_lattice(int *lattice, int n, int *energy, int *magnet)
+int calc_lattice(Lattice *self)
 {
-    int i, n2=n*n;
+    int i;
 
     // Resetea E y M
-    *energy = 0;
-    *magnet = 0;
+    *(self -> energy) = 0;
+	*(self -> magnet) = 0;
 
     // Recorre la red actualizando los valores de E y M
-    for (i=0; i<n2; i++)
+    for (i=0; i< self->n2; i++)
     {
-	(*energy) += calc_energy(lattice, n, i);
-	(*magnet) += calc_magnet(lattice, n, i);
+		*(self -> energy) += calc_energy(self, i);
+		*(self -> magnet) += calc_magnet(self, i);
     }
     return 0;
 }
