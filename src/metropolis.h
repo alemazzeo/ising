@@ -8,7 +8,7 @@ struct _lat
     int _n2;
     int _total_flips;
     float _T, _J, _B;
-    float _exps[10];
+    float _p_exps[10];
     int _W, _N, _E, _S;
     int _opposites;
     int *_p_energy, *_p_magnet;

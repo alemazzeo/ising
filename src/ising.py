@@ -13,7 +13,7 @@ class Lattice(C.Structure):
                 ("_T", C.c_float),
                 ("_J", C.c_float),
                 ("_N", C.c_float),
-                ("_exps",C.POINTER(C.c_float)),
+                ("_p_exps", C.c_float * 10),
                 ("_W", C.c_int),
                 ("_N", C.c_int),
                 ("_E", C.c_int),

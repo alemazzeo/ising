@@ -10,7 +10,7 @@ int init(Lattice *self, int n)
     self -> _total_flips = 0;
 
     set(self, 2.0, 1.0, 0.0);
-    
+
     self -> _opposites = 0;
     *(self -> _p_energy) = 0;
     *(self -> _p_magnet) = 0;
@@ -22,18 +22,18 @@ int set(Lattice *self, float T, float J, float B)
     self -> _T = T;
     self -> _J = J;
     self -> _B = B;
-    
-    self -> _exps[0] = exp( (+4*J - 2*B) / T );
-    self -> _exps[1] = exp( (+2*J - 2*B) / T );
-    self -> _exps[2] = exp( (   0 - 2*B) / T );
-    self -> _exps[3] = exp( (-2*J - 2*B) / T );
-    self -> _exps[4] = exp( (-4*J - 2*B) / T );
-    
-    self -> _exps[5] = exp( (+4*J + 2*B) / T );
-    self -> _exps[6] = exp( (+2*J + 2*B) / T );
-    self -> _exps[7] = exp( (   0 + 2*B) / T );
-    self -> _exps[8] = exp( (-2*J + 2*B) / T );
-    self -> _exps[9] = exp( (-4*J + 2*B) / T );
+
+    self -> _p_exps[0] = exp( (+4*J - 2*B) / T );
+    self -> _p_exps[1] = exp( (+2*J - 2*B) / T );
+    self -> _p_exps[2] = exp( (   0 - 2*B) / T );
+    self -> _p_exps[3] = exp( (-2*J - 2*B) / T );
+    self -> _p_exps[4] = exp( (-4*J - 2*B) / T );
+
+    self -> _p_exps[5] = exp( (+4*J + 2*B) / T );
+    self -> _p_exps[6] = exp( (+2*J + 2*B) / T );
+    self -> _p_exps[7] = exp( (   0 + 2*B) / T );
+    self -> _p_exps[8] = exp( (-2*J + 2*B) / T );
+    self -> _p_exps[9] = exp( (-4*J + 2*B) / T );
 
     return 0;
 }
@@ -58,9 +58,9 @@ int metropolis(Lattice *self, int pasos)
     for(i=0; i<pasos; i++)
     {
         // Pide la posición de un spin al azar
-	idx = pick_site(self);
-	// Trata de dar vuelta el spin
-	nflips += flip(self, idx);
+		idx = pick_site(self);
+		// Trata de dar vuelta el spin
+		nflips += flip(self, idx);
     }
     self -> _total_flips += nflips;
     // Devuelve el número de flips conseguidos
@@ -86,18 +86,18 @@ int flip(Lattice *self, int idx)
 
     // Calcula pi
     pi = calc_pi(self, idx, opposites);
-    
+
     // Intenta realizar el flip
     if (try_flip(self, pi))
     {
-	// Acepta el flip. Actualiza E y M
-	accept_flip(self, idx, opposites);
-	return 1;
+		// Acepta el flip. Actualiza E y M
+		accept_flip(self, idx, opposites);
+		return 1;
     }
     else
     {
-	// Da aviso del flip rechazado
-	return 0;
+		// Da aviso del flip rechazado
+		return 0;
     }
 }
 
@@ -128,13 +128,13 @@ int cost(Lattice *self, int idx)
 
     // (4, 2, 0, -2, 4) / 2 + 2 --> (4, 3, 2, 1, 0)
     self -> _opposites = ((self -> _p_lattice[self -> _W]) *
-			  (self -> _p_lattice[idx]) +
-			  (self -> _p_lattice[self -> _N]) *
-			  (self -> _p_lattice[idx]) +
-			  (self -> _p_lattice[self -> _E]) *
-			  (self -> _p_lattice[idx]) +
-			  (self -> _p_lattice[self -> _S]) *
-			  (self -> _p_lattice[idx])) / 2 + 2;
+						  (self -> _p_lattice[idx]) +
+						  (self -> _p_lattice[self -> _N]) *
+						  (self -> _p_lattice[idx]) +
+						  (self -> _p_lattice[self -> _E]) *
+						  (self -> _p_lattice[idx]) +
+						  (self -> _p_lattice[self -> _S]) *
+						  (self -> _p_lattice[idx])) / 2 + 2;
 
     return self -> _opposites;
 }
@@ -143,14 +143,14 @@ int try_flip(Lattice *self, float pi)
 {
     if (pi > 1)
     {
-	return 1;
+		return 1;
     }
     else
     {
-	if (pi*RAND_MAX > rand())
-	    return 1;
-	else
-	    return 0;
+		if (pi*RAND_MAX > rand())
+			return 1;
+		else
+			return 0;
     }
 }
 
@@ -168,9 +168,9 @@ int accept_flip(Lattice *self, int idx, int opposites)
 float calc_pi(Lattice *self, int idx, int opposites)
 {
     if (self -> _p_lattice[idx] < 0)
-	return self -> _exps[opposites];
+		return self -> _p_exps[opposites];
     else
-	return self -> _exps[opposites+5];
+		return self -> _p_exps[opposites+5];
 }
 
 int calc_energy(Lattice *self, int idx)
