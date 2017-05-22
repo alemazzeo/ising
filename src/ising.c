@@ -36,7 +36,7 @@ int main(int argc, char **argv)
 	ising -> _p_magnet = malloc(sizeof(int));
 
     init(ising, n);
-    set(ising, T, J, B);
+    set_params(ising, T, J, B);
 
     fill_lattice(ising -> _p_lattice, n, prob);
     calc_lattice(ising);

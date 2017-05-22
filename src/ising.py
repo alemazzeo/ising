@@ -1,26 +1,27 @@
 import numpy as np
 import ctypes as C
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 #import time
 #import threading
 #import os
 
 class Lattice(C.Structure):
-    _fields_ = [("_p_lattice",C.POINTER(C.c_int)),
+    _fields_ = [("_p_lattice", C.POINTER(C.c_int)),
                 ("_n", C.c_int),
                 ("_n2", C.c_int),
                 ("_total_flips", C.c_int),
                 ("_T", C.c_float),
                 ("_J", C.c_float),
-                ("_N", C.c_float),
+                ("_B", C.c_float),
                 ("_p_exps", C.c_float * 10),
                 ("_W", C.c_int),
                 ("_N", C.c_int),
                 ("_E", C.c_int),
                 ("_S", C.c_int),
                 ("_opposites", C.c_int),
-                ("_p_energy",C.POINTER(C.c_int)),
-                ("_p_magnet",C.POINTER(C.c_int))]
+                ("_p_energy", C.POINTER(C.c_float)),
+                ("_p_magnet", C.POINTER(C.c_int))]
 
     def __init__(self, n, data='../datos/', lib='./libising.so'):
 
@@ -30,16 +31,61 @@ class Lattice(C.Structure):
         # Biblioteca de funciones
         self._lib = C.CDLL(lib)
 
+        self.__init = self._lib.init
+        self.__set_params = self._lib.set_params
+        self.__info = self._lib.info
+        self.__metropolis = self._lib.metropolis
+        self.__pick_site = self._lib.pick_site
+        self.__flip = self._lib.flip
+        self.__find_neighbors = self._lib.find_neighbors
+        self.__cost = self._lib.cost
+        self.__try_flip = self._lib.try_flip
+        self.__accept_flip = self._lib.accept_flip
+        self.__calc_pi = self._lib.calc_pi
+        self.__calc_energy = self._lib.calc_energy
+        self.__calc_magnet = self._lib.calc_magnet
+        self.__calc_lattice = self._lib.calc_lattice
+
+        self.__init.restype = C.c_int
+        self.__set_params.restype = C.c_int
+        self.__info.restype = C.c_int
+        self.__metropolis.restype = C.c_int
+        self.__pick_site.restype = C.c_int
+        self.__flip.restype = C.c_int
+        self.__find_neighbors.restype = C.c_int
+        self.__cost.restype = C.c_int
+        self.__try_flip.restype = C.c_int
+        self.__accept_flip.restype = C.c_int
+        self.__calc_pi.restype = C.c_float
+        self.__calc_energy.restype = C.c_float
+        self.__calc_magnet.restype = C.c_int
+        self.__calc_lattice.restype = C.c_int
+
+        self.__init.argtypes = [C.POINTER(Lattice), C.c_int]
+        self.__set_params.argtypes = [C.POINTER(Lattice), C.c_float, C.c_float, C.c_float]
+        self.__info.argtypes = [C.POINTER(Lattice)]
+        self.__metropolis.argtypes = [C.POINTER(Lattice), C.c_int]
+        self.__pick_site.argtypes = [C.POINTER(Lattice)]
+        self.__flip.argtypes = [C.POINTER(Lattice), C.c_int]
+        self.__find_neighbors.argtypes = [C.POINTER(Lattice), C.c_int]
+        self.__cost.argtypes = [C.POINTER(Lattice), C.c_int]
+        self.__try_flip.argtypes = [C.POINTER(Lattice), C.c_float]
+        self.__accept_flip.argtypes = [C.POINTER(Lattice), C.c_int, C.c_int]
+        self.__calc_pi.argtypes = [C.POINTER(Lattice), C.c_int, C.c_int]
+        self.__calc_energy.argtypes = [C.POINTER(Lattice), C.c_int]
+        self.__calc_magnet.argtypes = [C.POINTER(Lattice), C.c_int]
+        self.__calc_lattice.argtypes = [C.POINTER(Lattice)]
+
         # Memoria asignada a la red
         self._lattice = np.ones(n**2, dtype=C.c_int)
         self._p_lattice = self._lattice.ctypes.data_as(C.POINTER(C.c_int))
-        self._energy = C.c_int(0)
+        self._energy = C.c_float(0.0)
         self._p_energy = C.pointer(self._energy)
         self._magnet = C.c_int(0)
         self._p_magnet = C.pointer(self._magnet)
 
         # Inicializa los valores
-        self._lib.init(C.pointer(self), n)
+        self.__init(self, n)
         self.calc_lattice()
 
         # Lista de valores obtenidos (para graficar)
@@ -61,16 +107,50 @@ class Lattice(C.Structure):
         # Flag de modo test
         self._test_mode = False
         # Máscara para vecinos y valor
-        self._mask_v = 5
+        self._mask_v = 3
         self._mask = np.zeros(self._n**2, dtype=bool)
         # Diccionario de eventos conectados
         self._events = {'close_event': None,
                         'button_press_event': None,
                         'motion_notify_event': None}
 
+    def _set(self, T=None, J=None, B=None):
+        if T is None:
+            T = self._T
+        if J is None:
+            J = self._J
+        if B is None:
+            B = self._B
+        self._lib.set_params(C.pointer(self),
+                             C.c_float(T),
+                             C.c_float(J),
+                             C.c_float(B))
+
+    @property
+    def T(self): return self._T
+
+    @T.setter
+    def T(self, value): self._set(T=value)
+
+    @property
+    def J(self): return self._J
+
+    @J.setter
+    def J(self, value): self._set(J=value)
+
+    @property
+    def B(self): return self._B
+
+    @B.setter
+    def B(self, value): self._set(B=value)
+
+    @property
+    def nflips(self): return self._total_flips
+
     def run(self, niter=1000):
+        # Prepara la memoria para
         # Llama a la función metropolis
-        nflips = self._lib.metropolis(C.pointer(self), C.c_int(niter))
+        nflips = self.__metropolis(self, niter)
         # Actualiza
         self._refresh()
         # Devuelve los pasos aceptados
@@ -85,30 +165,29 @@ class Lattice(C.Structure):
         self._refresh()
 
     def pick_site(self):
-        site = self._lib.pick_site(C.pointer(self))
-        return site
+        return self.__pick_site(self)
 
     def find_neighbors(self, idx):
-        self._lib.find_neighbors(C.pointer(self), C.c_int(idx))
+        self.__find_neighbors(self, idx)
         return self._W, self._N, self._E, self._S
 
     def cost(self, idx):
         self.find_neighbors(idx)
-        return self._lib.cost(C.pointer(self), idx)
+        return self.__cost(self, idx)
 
     def accept_flip(self, idx):
         opposites = self.cost(idx)
-        self._lib.accept_flip(C.pointer(self), C.c_int(idx), C.c_int(opposites))
+        self.__accept_flip(self, idx, opposites)
         self._refresh()
 
     def calc_energy(self, idx):
-        return self._lib.calc_energy(C.pointer(self), C.c_int(idx))
+        return self.__calc_energy(self, idx)
 
     def calc_magnet(self, idx):
-        return self._lib.calc_magnet(C.pointer(self), C.c_int(idx))
+        return self.__calc_magnet(self, idx)
 
     def calc_lattice(self):
-        self._lib.calc_lattice(C.pointer(self))
+        self.__calc_lattice(self)
 
     def view(self, lattice=True, energy=True, magnet=True, temp=True):
         # Si la vista no fue creada

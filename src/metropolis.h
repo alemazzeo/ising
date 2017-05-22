@@ -3,21 +3,22 @@
 
 struct _lat
 {
-    int *_p_lattice;
-    int _n;
-    int _n2;
-    int _total_flips;
+    int   *_p_lattice;
+    int   _n;
+    int   _n2;
+    int   _total_flips;
     float _T, _J, _B;
     float _p_exps[10];
-    int _W, _N, _E, _S;
-    int _opposites;
-    int *_p_energy, *_p_magnet;
+    int   _W, _N, _E, _S;
+    int   _opposites;
+    float *_p_energy;
+	int   *_p_magnet;
 };
 
 typedef struct _lat Lattice;
 
 int   init           (Lattice *self, int n);
-int   set            (Lattice *self, float T, float J, float B);
+int   set_params     (Lattice *self, float T, float J, float B);
 int   info           (Lattice *self);
 int   metropolis     (Lattice *self, int pasos);
 int   pick_site      (Lattice *self);
@@ -27,7 +28,7 @@ int   cost           (Lattice *self, int idx);
 int   try_flip       (Lattice *self, float pi);
 int   accept_flip    (Lattice *self, int idx, int opposites);
 float calc_pi        (Lattice *self, int idx, int opposites);
-int   calc_energy    (Lattice *self, int idx);
-int   calc_energy    (Lattice *self, int idx);
+float calc_energy    (Lattice *self, int idx);
+int   calc_magnet    (Lattice *self, int idx);
 int   calc_lattice   (Lattice *self);
 #endif
