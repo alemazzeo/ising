@@ -10,6 +10,7 @@ class Lattice(C.Structure):
     _fields_ = [("_p_lattice", C.POINTER(C.c_int)),
                 ("_n", C.c_int),
                 ("_n2", C.c_int),
+                ("_flips", C.c_int),
                 ("_total_flips", C.c_int),
                 ("_T", C.c_float),
                 ("_J", C.c_float),
@@ -98,8 +99,10 @@ class Lattice(C.Structure):
         self._list_M = list()
         self._list_C = list()
 
-        # Figura principal
+        # Figuras
         self._fig = None
+        self._fig_energy = None
+        self._fig_magnet = None
 
         # Subplot lattice
         self._subp_lattice = None
@@ -120,6 +123,8 @@ class Lattice(C.Structure):
 
         # Flag de vista activa
         self._active_view = False
+        # Modo de vista activa
+        self._view_mode = 'all'
         # Ultimo spin seleccionado
         self._current_idx = -1
         # Flag de modo test
@@ -139,10 +144,10 @@ class Lattice(C.Structure):
             J = self._J
         if B is None:
             B = self._B
-        self._lib.set_params(C.pointer(self),
-                             C.c_float(T),
-                             C.c_float(J),
-                             C.c_float(B))
+        print (T)
+        print (J)
+        print (B)
+        self._lib.set_params(self, T, J, B)
 
     @property
     def T(self): return self._T
@@ -211,17 +216,63 @@ class Lattice(C.Structure):
     def calc_lattice(self):
         self.__calc_lattice(self)
 
-    def view(self, lattice=True, energy=True, magnet=True, temp=True):
+    def view(self, mode='lattice'):
+        self._view_mode = mode
         # Si la vista no fue creada
         if not self._active_view:
             # Crea el marco interactivo
             plt.ion()
+
+            # Crea la grilla para los subplots
+            gs = gridspec.GridSpec(2,5)
+            pos1 = gs[0:2,0:2]
+            pos2 = gs[0,3:]
+            pos3 = gs[1,3:]
+
             # Almacena el objeto figura
             self._fig = plt.figure()
-            # Crea el subplot lattice
-            self._plot_lattice(self._fig)
+
+            # Configura los subplots
+            config1 = {#'xlim':   (0,1),
+                       #'ylim':   (0,1),
+                       #'xlabel': '$N$',
+                       #'ylabel': '$E$',
+                       'xscale': 'linear',
+                       'yscale': 'linear',
+                       'axisbg': 'w',
+                       #'title':  'Lattice',
+                       'aspect': 'auto'}
+            config2 = {#'xlim':   (0,1),
+                       #'ylim':   (0,1),
+                       'xlabel': '$N$',
+                       'ylabel': '$E$',
+                       'xscale': 'linear',
+                       'yscale': 'linear',
+                       'axisbg': 'w',
+                       #'title':  'Energy',
+                       'aspect': 'auto'}
+            config3 = {#'xlim':   (-5,5),
+                       #'ylim':   (-2,2),
+                       'xlabel': '$N$',
+                       'ylabel': '$M$',
+                       'xscale': 'linear',
+                       'yscale': 'linear',
+                       'axisbg': 'w',
+                       #'title':  'Magnet',
+                       'aspect': 'auto'}
+
+            # Crea los subplot
+            if mode == 'all':
+                self._fig.subplots_adjust(wspace = .8, hspace=.4)
+                self._plot_lattice(self._fig, pos1, **config1)
+                self._plot_energy(self._fig, pos2, **config2)
+                self._plot_magnet(self._fig, pos3, **config3)
+            elif mode == 'lattice':
+                self._plot_lattice(self._fig, 111, **config1)
+
             # Configura una función para detectar el cierre de la ventana
             self._connect_event('close_event')
+
             # Actualiza
             self._active_view = True
             self._refresh()
@@ -231,41 +282,55 @@ class Lattice(C.Structure):
             self._fig.canvas.get_tk_widget().focus_force()
             self._refresh()
 
-    def _plot_lattice(self, fig=None, pos=None):
+    def _plot_lattice(self, fig=None, pos=None, **kargs):
         if fig is None:
             fig = self._fig
         if pos is None:
             pos = 111
         # Almacena el subplot para lattice
-        self._subp_lattice = fig.add_subplot(pos)
+        self._subp_lattice = fig.add_subplot(pos, **kargs)
         # Transforma el array en matriz
         aux = self._reshape()
         # Almacena el objeto dibujo
-        self._d_lat = self._subp_lattice.matshow(aux, cmap='gray')
+        self._d_lat = self._subp_lattice.matshow(aux, 
+                                                 cmap='gray',
+                                                 aspect='equal')
 
         return self._subp_lattice, self._d_lat
 
-    def _plot_energy(self, fig=None, pos=None):
+    def _plot_energy(self, fig=None, pos=None, **kargs):
         if fig is None:
             fig = self._fig
         if pos is None:
             pos = 111
         # Almacena el subplot para energy
-        self._subp_energy = fig.add_subplot(pos)
+        self._subp_energy = fig.add_subplot(pos, **kargs)
         # Almacena el objeto dibujo
-        self._d_energy = self._subp_energy.plot(self._energy)
-
+        self._d_energy, = self._subp_energy.plot(self._energy)
+                                                 
         return self._subp_energy, self._d_energy
 
-    def _plot_ac_energy(self, fig=None, pos=None):
+    def _plot_magnet(self, fig=None, pos=None, **kargs):
         if fig is None:
             fig = self._fig
         if pos is None:
             pos = 111
         # Almacena el subplot para energy
-        self._subp_ac_energy = fig.add_subplot(pos)
+        self._subp_magnet = fig.add_subplot(pos, **kargs)
         # Almacena el objeto dibujo
-        self._d_ac_energy = self._subp_ac_energy.plot(self._energy)
+        self._d_magnet, = self._subp_magnet.plot(self._magnet)
+
+        return self._subp_magnet, self._d_magnet
+
+    def _plot_ac_energy(self, fig=None, pos=None, **kargs):
+        if fig is None:
+            fig = self._fig
+        if pos is None:
+            pos = 111
+        # Almacena el subplot para energy
+        self._subp_ac_energy = fig.add_subplot(pos, **kargs)
+        # Almacena el objeto dibujo
+        self._d_ac_energy, = self._subp_ac_energy.plot(self._energy)
 
         return self._subp_ac_energy, self._d_ac_energy
 
@@ -293,8 +358,32 @@ class Lattice(C.Structure):
                 self._d_lat.set_clim(vmin=-1, vmax=1)
 
             # Actualiza el dibujo
-            self._d_lat.set_array(aux)
+            if self._view_mode == 'all':
+                self._d_lat.set_array(aux)
+                self._d_energy.set_xdata(self._energy)
+                self._d_magnet.set_xdata(self._magnet)
+            elif self._view_mode == 'lattice':
+                self._d_lat.set_array(aux)
             plt.draw()
+
+    def _refresh_all(self):
+        pass
+
+    def _refresh_lattice(self):
+        pass
+
+    def _refresh_energy(self):
+        pass
+        
+    def _refresh_magnet(self):
+        pass
+
+    def plot_energy(self, **kargs):
+        params = {'xlim': (0, self._flips)}
+        params.update(kargs)
+        fig = plt.figure()
+        self._plot_energy(fig, 111, **params)
+        plt.show()
 
     def test(self, active=True):
         if not self._active_view:
@@ -350,7 +439,7 @@ class Lattice(C.Structure):
 
     def _onmotion(self, evt):
         self._mask = np.ones(self._n**2, dtype=bool)
-        if evt.inaxes != self._draw.axes: return
+        if evt.inaxes != self._d_lat.axes: return
         idx = int(evt.xdata+0.5) + int(evt.ydata+0.5) * self._n
         W, N, E, S = self.find_neighbors(idx)
         self._mask[W] = False
