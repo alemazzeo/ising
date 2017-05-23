@@ -14,12 +14,13 @@ class Lattice(C.Structure):
                 ("_T", C.c_float),
                 ("_J", C.c_float),
                 ("_B", C.c_float),
+                ("_p_dEs", C.c_float * 10),
                 ("_p_exps", C.c_float * 10),
                 ("_W", C.c_int),
                 ("_N", C.c_int),
                 ("_E", C.c_int),
                 ("_S", C.c_int),
-                ("_opposites", C.c_int),
+                ("_aligned", C.c_int),
                 ("_p_energy", C.POINTER(C.c_float)),
                 ("_p_magnet", C.POINTER(C.c_int))]
 
@@ -27,6 +28,9 @@ class Lattice(C.Structure):
 
         # Origen de datos
         self._data = data
+
+        # Valores por defecto
+        self._step_size = 1000
 
         # Biblioteca de funciones
         self._lib = C.CDLL(lib)
@@ -79,10 +83,10 @@ class Lattice(C.Structure):
         # Memoria asignada a la red
         self._lattice = np.ones(n**2, dtype=C.c_int)
         self._p_lattice = self._lattice.ctypes.data_as(C.POINTER(C.c_int))
-        self._energy = C.c_float(0.0)
-        self._p_energy = C.pointer(self._energy)
-        self._magnet = C.c_int(0)
-        self._p_magnet = C.pointer(self._magnet)
+        self._energy = np.zeros(self._step_size, dtype=C.c_float)
+        self._p_energy = self._energy.ctypes.data_as(C.POINTER(C.c_float))
+        self._magnet = np.zeros(self._step_size, dtype=C.c_int)
+        self._p_magnet = self._magnet.ctypes.data_as(C.POINTER(C.c_int))
 
         # Inicializa los valores
         self.__init(self, n)
@@ -96,10 +100,24 @@ class Lattice(C.Structure):
 
         # Figura principal
         self._fig = None
+
         # Subplot lattice
         self._subp_lattice = None
         # Dibujo de la matriz
-        self._draw = None
+        self._d_lat = None
+        # Subplot energy
+        self._subp_energy = None
+        # Dibujo de energy
+        self._d_energy = None
+        # Subplot magnet
+        self._subp_magnet = None
+        # Dibujo de magnet
+        self._d_magnet = None
+        # Subplot energy autocorrelation
+        self._subp_ac_energy = None
+        # Dibujo de la matriz
+        self._d_ac_energy = None
+
         # Flag de vista activa
         self._active_view = False
         # Ultimo spin seleccionado
@@ -147,18 +165,22 @@ class Lattice(C.Structure):
     @property
     def nflips(self): return self._total_flips
 
-    def run(self, niter=1000):
-        # Prepara la memoria para
+    def run(self, step_size=None):
+        if step_size is None:
+            step_size = self._step_size
+        # Prepara la memoria para alojar los resultados de E y M
+        self._energy = np.zeros(step_size, dtype=C.c_float)
+        self._p_energy = self._energy.ctypes.data_as(C.POINTER(C.c_float))
+        self._magnet = np.zeros(step_size, dtype=C.c_int)
+        self._p_magnet = self._magnet.ctypes.data_as(C.POINTER(C.c_int))
         # Llama a la función metropolis
-        nflips = self.__metropolis(self, niter)
+        nflips = self.__metropolis(self, step_size)
         # Actualiza
         self._refresh()
         # Devuelve los pasos aceptados
         return nflips
 
     def fill_random(self, prob=0.5):
-        # Crea una matriz auxiliar de unos
-        aux = np.ones(self._n**2, dtype=C.c_int)
         # Da vuelta con probabilidad prob los elementos
         self._lattice[np.random.rand(self._n**2) > prob] *= -1
         # Actualiza
@@ -176,8 +198,8 @@ class Lattice(C.Structure):
         return self.__cost(self, idx)
 
     def accept_flip(self, idx):
-        opposites = self.cost(idx)
-        self.__accept_flip(self, idx, opposites)
+        aligned = self.cost(idx)
+        self.__accept_flip(self, idx, aligned)
         self._refresh()
 
     def calc_energy(self, idx):
@@ -196,12 +218,8 @@ class Lattice(C.Structure):
             plt.ion()
             # Almacena el objeto figura
             self._fig = plt.figure()
-            # Almacena el subplot para lattice
-            self._subp_lattice = self._fig.add_subplot(111)
-            # Transforma el array en matriz
-            aux = self._reshape()
-            # Almacena el objeto dibujo
-            self._draw = self._subp_lattice.matshow(aux, cmap='gray')
+            # Crea el subplot lattice
+            self._plot_lattice(self._fig)
             # Configura una función para detectar el cierre de la ventana
             self._connect_event('close_event')
             # Actualiza
@@ -212,6 +230,44 @@ class Lattice(C.Structure):
             # Fuerza el foco a la figura
             self._fig.canvas.get_tk_widget().focus_force()
             self._refresh()
+
+    def _plot_lattice(self, fig=None, pos=None):
+        if fig is None:
+            fig = self._fig
+        if pos is None:
+            pos = 111
+        # Almacena el subplot para lattice
+        self._subp_lattice = fig.add_subplot(pos)
+        # Transforma el array en matriz
+        aux = self._reshape()
+        # Almacena el objeto dibujo
+        self._d_lat = self._subp_lattice.matshow(aux, cmap='gray')
+
+        return self._subp_lattice, self._d_lat
+
+    def _plot_energy(self, fig=None, pos=None):
+        if fig is None:
+            fig = self._fig
+        if pos is None:
+            pos = 111
+        # Almacena el subplot para energy
+        self._subp_energy = fig.add_subplot(pos)
+        # Almacena el objeto dibujo
+        self._d_energy = self._subp_energy.plot(self._energy)
+
+        return self._subp_energy, self._d_energy
+
+    def _plot_ac_energy(self, fig=None, pos=None):
+        if fig is None:
+            fig = self._fig
+        if pos is None:
+            pos = 111
+        # Almacena el subplot para energy
+        self._subp_ac_energy = fig.add_subplot(pos)
+        # Almacena el objeto dibujo
+        self._d_ac_energy = self._subp_ac_energy.plot(self._energy)
+
+        return self._subp_ac_energy, self._d_ac_energy
 
     def _reshape(self):
         # Copia el array 1D y lo transforma en matriz
@@ -231,13 +287,13 @@ class Lattice(C.Structure):
             # Para el modo test
             if self._test_mode:
                 # Setea los valores máximo y minimo
-                self._draw.set_clim(vmin=-self._mask_v, vmax=self._mask_v)
+                self._d_lat.set_clim(vmin=-self._mask_v, vmax=self._mask_v)
             else:
                 # Setea los valores máximo y minimo
-                self._draw.set_clim(vmin=-1, vmax=1)
+                self._d_lat.set_clim(vmin=-1, vmax=1)
 
             # Actualiza el dibujo
-            self._draw.set_array(aux)
+            self._d_lat.set_array(aux)
             plt.draw()
 
     def test(self, active=True):

@@ -32,8 +32,8 @@ int main(int argc, char **argv)
 
     ising = malloc(sizeof(Lattice));
     ising -> _p_lattice = malloc(n*n*sizeof(int));
-	ising -> _p_energy = malloc(sizeof(int));
-	ising -> _p_magnet = malloc(sizeof(int));
+	ising -> _p_energy = malloc(pasos * sizeof(int));
+	ising -> _p_magnet = malloc(pasos * sizeof(int));
 
     init(ising, n);
     set_params(ising, T, J, B);
