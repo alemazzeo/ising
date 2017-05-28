@@ -292,7 +292,7 @@ class Lattice(C.Structure):
         # Transforma el array en matriz
         aux = self._reshape()
         # Almacena el objeto dibujo
-        self._d_lat = self._subp_lattice.matshow(aux, 
+        self._d_lat = self._subp_lattice.matshow(aux,
                                                  cmap='gray',
                                                  aspect='equal')
 
@@ -307,7 +307,7 @@ class Lattice(C.Structure):
         self._subp_energy = fig.add_subplot(pos, **kargs)
         # Almacena el objeto dibujo
         self._d_energy, = self._subp_energy.plot(self._energy)
-                                                 
+
         return self._subp_energy, self._d_energy
 
     def _plot_magnet(self, fig=None, pos=None, **kargs):
@@ -374,7 +374,7 @@ class Lattice(C.Structure):
 
     def _refresh_energy(self):
         pass
-        
+
     def _refresh_magnet(self):
         pass
 
@@ -460,3 +460,87 @@ class Lattice(C.Structure):
         result = np.fft.ifft((fftx - fftx_mean) * (ffty - ffty_mean))
         result = np.fft.fftshift(result)
         return [i / (fftx_std * ffty_std) for i in result.real]
+
+class LivePlot():
+    def __init__(self, name='Untitled'):
+        self._figure = plt.figure(name)
+        self._figure.clear()
+        self._subplots = dict()
+        self._curves = dict()
+        self._mats = dict()
+
+        self._events = {'close_event': None,
+                        'button_press_event': None,
+                        'motion_notify_event': None}
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
+    def _connect_event(self, **kargs):
+        for event, function in kargs.items():
+            self._events[event] = self._figure.canvas.mpl_connect(event, function)
+
+    def _disconnect_event(self, *args):
+        for event in args:
+            event_id = self._events[event]
+            self._fig.canvas.mpl_disconnect(event_id)
+
+    def add_subplot(self, name, pos=111, **config):
+        subplot = self._figure.add_subplot(pos, **config)
+        self._subplots.update(name, subplot)
+        return subplot
+
+    def add_curve(self, name, subplot, xdata=None, ydata=None, **config):
+        if xdata is None:
+            curve, = self._subplots[subplot].plot(ydata, **config)
+        else:
+            curve, = self._subplots[subplot].plot(xdata, ydata, **config)
+
+        self._curves.update(name, curve)
+        return curve
+
+    def add_matrix(self, name, subplot, matrix, **config):
+        mat = self._subplots[subplot].plot(xdata, ydata, **config)
+        self._mats.update(name, mat)
+        return mat
+
+    def save(self, file_name=None, path='./Plots/', file_type='png'):
+        self._figure.savefig(path + file_name + file_type)
+
+class Curve():
+    def __init__(self, name, subplot, **config):
+        self._data = None
+        self._curve, = self._subplots[subplot].plot([], [] , **config)
+
+    @property
+    def data(self): return self._data
+
+    @data.setter
+    def data(self, data):
+        self._data = data
+        self._curve.set_data(data[0], data[1])
+
+    @property
+    def label(self): return self._label
+
+class Lattice():
+    def __init__(self):
+        pass
+
+    def fill_random(self):
+        pass
+
+    def matrix_form(self):
+        pass
+
+    def calc_energy(self):
+        pass
+
+    def calc_magnet(self):
+        pass
+
+    def calc_all(self):
+        pass
