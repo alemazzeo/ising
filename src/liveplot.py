@@ -15,14 +15,15 @@ class LivePlot():
                         'button_press_event': None,
                         'motion_notify_event': None}
 
-    def _generate(self):
+    def show(self):
         plt.ion()
         self._fig = plt.figure(self._name)
 
         for name, subplot in self._subplots.items():
             subplot._ax = self._fig.add_subplot(*subplot._args, **subplot._kargs)
             for name, curve in subplot._curves.items():
-                dataset, = subplot._ax.plot(curve.xdata, curve.ydata, **curve._config)
+                dataset, = subplot._ax.plot(curve.xdata, curve.ydata,
+                                            *curve._args, **curve._kwargs)
                 self._plots[name] = dataset
 
     def _update(self):
@@ -59,7 +60,11 @@ class Subplot():
         self._curves = dict()
         self._ax = None
 
-    def plot(self, curve, **config):
+    def plot(self, curve, *args, **kwargs):
+        self._curves.update({curve._name: curve})
+        curve._connect(self, *args, **kwargs)
+
+    def matshow(self, curve, **config):
         self._curves.update({curve._name: curve})
         curve._connect(self, **config)
 
@@ -72,8 +77,11 @@ class Curve():
         self._data = None
         self._xdata = None
         self._ydata = None
-        self._config = dict()
+        self._args = None
+        self._kwargs = None
         self._subplots = dict()
+        self._quickplot = None
+        self._quickax = None
 
     @property
     def data(self):
@@ -121,12 +129,16 @@ class Curve():
         for name, subplot in self._subplots.items():
             subplot._update()
 
-    def _connect(self, subplot, **config):
-        self._config.update(config)
+    def _connect(self, subplot, *args, **kwargs):
+        self._args = args
+        self._kwargs = kwargs
         self._subplots.update({subplot._name: subplot})
 
     def _disconnect(self, subplot):
         self._subplots.pop(subplot._name)
 
-    @property
-    def label(self): return self._label
+    def plot(self, *args, **kargs):
+        self._quickplot = LivePlot(self._name + ' preview')
+        self._quickax = self._quickplot.add_subplot(self._name, 111)
+        self._quickax.plot(self, *args, **kargs)
+        self._quickplot.show()
