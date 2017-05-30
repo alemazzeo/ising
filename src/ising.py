@@ -2,9 +2,8 @@ import numpy as np
 import ctypes as C
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-#import time
-#import threading
-#import os
+from liveplot import LivePlot, Curve
+import time
 
 class Lattice(C.Structure):
     _fields_ = [("_p_lattice", C.POINTER(C.c_int)),
@@ -25,16 +24,10 @@ class Lattice(C.Structure):
                 ("_p_energy", C.POINTER(C.c_float)),
                 ("_p_magnet", C.POINTER(C.c_int))]
 
-    def __init__(self, n, data='../datos/', lib='./libising.so'):
-
-        # Origen de datos
-        self._data = data
-
-        # Valores por defecto
-        self._step_size = 1000
+    def __init__(self, n, data='../datos/'):
 
         # Biblioteca de funciones
-        self._lib = C.CDLL(lib)
+        self._lib = C.CDLL('./libising.so')
 
         self.__init = self._lib.init
         self.__set_params = self._lib.set_params
@@ -81,61 +74,26 @@ class Lattice(C.Structure):
         self.__calc_magnet.argtypes = [C.POINTER(Lattice), C.c_int]
         self.__calc_lattice.argtypes = [C.POINTER(Lattice)]
 
+        # Origen de datos
+        self._data = data
+
+        # Otras variables internas
+        self._step_size = None
+        self._max_ntry = 1e6
+
+        # Curvas para liveplot
+        self.lattice = Curve('Lattice')
+        self.energy = Curve('Energy')
+        self.magnet = Curve('Magnetization')
+
         # Memoria asignada a la red
         self._lattice = np.ones(n**2, dtype=C.c_int)
         self._p_lattice = self._lattice.ctypes.data_as(C.POINTER(C.c_int))
-        self._energy = np.zeros(self._step_size, dtype=C.c_float)
-        self._p_energy = self._energy.ctypes.data_as(C.POINTER(C.c_float))
-        self._magnet = np.zeros(self._step_size, dtype=C.c_int)
-        self._p_magnet = self._magnet.ctypes.data_as(C.POINTER(C.c_int))
+        self.step_size = int(1.5 * n**2)
 
         # Inicializa los valores
         self.__init(self, n)
         self.calc_lattice()
-
-        # Lista de valores obtenidos (para graficar)
-        self._list_T = list()
-        self._list_E = list()
-        self._list_M = list()
-        self._list_C = list()
-
-        # Figuras
-        self._fig = None
-        self._fig_energy = None
-        self._fig_magnet = None
-
-        # Subplot lattice
-        self._subp_lattice = None
-        # Dibujo de la matriz
-        self._d_lat = None
-        # Subplot energy
-        self._subp_energy = None
-        # Dibujo de energy
-        self._d_energy = None
-        # Subplot magnet
-        self._subp_magnet = None
-        # Dibujo de magnet
-        self._d_magnet = None
-        # Subplot energy autocorrelation
-        self._subp_ac_energy = None
-        # Dibujo de la matriz
-        self._d_ac_energy = None
-
-        # Flag de vista activa
-        self._active_view = False
-        # Modo de vista activa
-        self._view_mode = 'all'
-        # Ultimo spin seleccionado
-        self._current_idx = -1
-        # Flag de modo test
-        self._test_mode = False
-        # Máscara para vecinos y valor
-        self._mask_v = 3
-        self._mask = np.zeros(self._n**2, dtype=bool)
-        # Diccionario de eventos conectados
-        self._events = {'close_event': None,
-                        'button_press_event': None,
-                        'motion_notify_event': None}
 
     def _set(self, T=None, J=None, B=None):
         if T is None:
@@ -147,7 +105,7 @@ class Lattice(C.Structure):
         print (T)
         print (J)
         print (B)
-        self._lib.set_params(self, T, J, B)
+        self.__set_params(self, T, J, B)
 
     @property
     def T(self): return self._T
@@ -170,26 +128,32 @@ class Lattice(C.Structure):
     @property
     def nflips(self): return self._total_flips
 
-    def run(self, step_size=None):
-        if step_size is None:
-            step_size = self._step_size
-        # Prepara la memoria para alojar los resultados de E y M
-        self._energy = np.zeros(step_size, dtype=C.c_float)
-        self._p_energy = self._energy.ctypes.data_as(C.POINTER(C.c_float))
-        self._magnet = np.zeros(step_size, dtype=C.c_int)
-        self._p_magnet = self._magnet.ctypes.data_as(C.POINTER(C.c_int))
-        # Llama a la función metropolis
-        nflips = self.__metropolis(self, step_size)
-        # Actualiza
-        self._refresh()
-        # Devuelve los pasos aceptados
-        return nflips
+    @property
+    def step_size(self): return self._step_size
+
+    @step_size.setter
+    def step_size(self, value):
+        if self._step_size != value:
+            self._step_size = value
+            self._energy = np.zeros(self._step_size, dtype=C.c_float)
+            self._p_energy = self._energy.ctypes.data_as(C.POINTER(C.c_float))
+            self._magnet = np.zeros(self._step_size, dtype=C.c_int)
+            self._p_magnet = self._magnet.ctypes.data_as(C.POINTER(C.c_int))
+
+    @property
+    def max_ntry(self): return self._max_ntry
+
+    @max_ntry.setter
+    def max_ntry(self, value): self._max_ntry = value
+
+    def _update(self):
+        self.lattice.data = np.copy(self._lattice).reshape([self._n, self._n])
+        self.energy.data = self._energy[0:self._flips]
+        self.magnet.data = self._magnet[0:self._flips]
 
     def fill_random(self, prob=0.5):
-        # Da vuelta con probabilidad prob los elementos
         self._lattice[np.random.rand(self._n**2) > prob] *= -1
-        # Actualiza
-        self._refresh()
+        self.lattice.data = np.copy(self._lattice).reshape([self._n, self._n])
 
     def pick_site(self):
         return self.__pick_site(self)
@@ -205,7 +169,6 @@ class Lattice(C.Structure):
     def accept_flip(self, idx):
         aligned = self.cost(idx)
         self.__accept_flip(self, idx, aligned)
-        self._refresh()
 
     def calc_energy(self, idx):
         return self.__calc_energy(self, idx)
@@ -216,267 +179,7 @@ class Lattice(C.Structure):
     def calc_lattice(self):
         self.__calc_lattice(self)
 
-    def view(self, mode='lattice'):
-        self._view_mode = mode
-        # Si la vista no fue creada
-        if not self._active_view:
-            # Crea el marco interactivo
-            plt.ion()
-
-            # Crea la grilla para los subplots
-            gs = gridspec.GridSpec(2,5)
-            pos1 = gs[0:2,0:2]
-            pos2 = gs[0,3:]
-            pos3 = gs[1,3:]
-
-            # Almacena el objeto figura
-            self._fig = plt.figure()
-
-            # Configura los subplots
-            config1 = {#'xlim':   (0,1),
-                       #'ylim':   (0,1),
-                       #'xlabel': '$N$',
-                       #'ylabel': '$E$',
-                       'xscale': 'linear',
-                       'yscale': 'linear',
-                       'axisbg': 'w',
-                       #'title':  'Lattice',
-                       'aspect': 'auto'}
-            config2 = {#'xlim':   (0,1),
-                       #'ylim':   (0,1),
-                       'xlabel': '$N$',
-                       'ylabel': '$E$',
-                       'xscale': 'linear',
-                       'yscale': 'linear',
-                       'axisbg': 'w',
-                       #'title':  'Energy',
-                       'aspect': 'auto'}
-            config3 = {#'xlim':   (-5,5),
-                       #'ylim':   (-2,2),
-                       'xlabel': '$N$',
-                       'ylabel': '$M$',
-                       'xscale': 'linear',
-                       'yscale': 'linear',
-                       'axisbg': 'w',
-                       #'title':  'Magnet',
-                       'aspect': 'auto'}
-
-            # Crea los subplot
-            if mode == 'all':
-                self._fig.subplots_adjust(wspace = .8, hspace=.4)
-                self._plot_lattice(self._fig, pos1, **config1)
-                self._plot_energy(self._fig, pos2, **config2)
-                self._plot_magnet(self._fig, pos3, **config3)
-            elif mode == 'lattice':
-                self._plot_lattice(self._fig, 111, **config1)
-
-            # Configura una función para detectar el cierre de la ventana
-            self._connect_event('close_event')
-
-            # Actualiza
-            self._active_view = True
-            self._refresh()
-
-        else:
-            # Fuerza el foco a la figura
-            self._fig.canvas.get_tk_widget().focus_force()
-            self._refresh()
-
-    def _plot_lattice(self, fig=None, pos=None, **kargs):
-        if fig is None:
-            fig = self._fig
-        if pos is None:
-            pos = 111
-        # Almacena el subplot para lattice
-        self._subp_lattice = fig.add_subplot(pos, **kargs)
-        # Transforma el array en matriz
-        aux = self._reshape()
-        # Almacena el objeto dibujo
-        self._d_lat = self._subp_lattice.matshow(aux,
-                                                 cmap='gray',
-                                                 aspect='equal')
-
-        return self._subp_lattice, self._d_lat
-
-    def _plot_energy(self, fig=None, pos=None, **kargs):
-        if fig is None:
-            fig = self._fig
-        if pos is None:
-            pos = 111
-        # Almacena el subplot para energy
-        self._subp_energy = fig.add_subplot(pos, **kargs)
-        # Almacena el objeto dibujo
-        self._d_energy, = self._subp_energy.plot(self._energy)
-
-        return self._subp_energy, self._d_energy
-
-    def _plot_magnet(self, fig=None, pos=None, **kargs):
-        if fig is None:
-            fig = self._fig
-        if pos is None:
-            pos = 111
-        # Almacena el subplot para energy
-        self._subp_magnet = fig.add_subplot(pos, **kargs)
-        # Almacena el objeto dibujo
-        self._d_magnet, = self._subp_magnet.plot(self._magnet)
-
-        return self._subp_magnet, self._d_magnet
-
-    def _plot_ac_energy(self, fig=None, pos=None, **kargs):
-        if fig is None:
-            fig = self._fig
-        if pos is None:
-            pos = 111
-        # Almacena el subplot para energy
-        self._subp_ac_energy = fig.add_subplot(pos, **kargs)
-        # Almacena el objeto dibujo
-        self._d_ac_energy, = self._subp_ac_energy.plot(self._energy)
-
-        return self._subp_ac_energy, self._d_ac_energy
-
-    def _reshape(self):
-        # Copia el array 1D y lo transforma en matriz
-        aux = np.copy(self._lattice).astype(int)
-        if self._test_mode:
-            # Aplica la máscara
-            aux[self._mask] *= self._mask_v
-        aux = aux.reshape(self._n, self._n)
-        return aux
-
-    def _refresh(self):
-        # Verifica que exista una ventana abierta
-        if self._active_view:
-            # Transforma el array en matriz
-            aux = self._reshape()
-
-            # Para el modo test
-            if self._test_mode:
-                # Setea los valores máximo y minimo
-                self._d_lat.set_clim(vmin=-self._mask_v, vmax=self._mask_v)
-            else:
-                # Setea los valores máximo y minimo
-                self._d_lat.set_clim(vmin=-1, vmax=1)
-
-            # Actualiza el dibujo
-            if self._view_mode == 'all':
-                self._d_lat.set_array(aux)
-                self._d_energy.set_xdata(self._energy)
-                self._d_magnet.set_xdata(self._magnet)
-            elif self._view_mode == 'lattice':
-                self._d_lat.set_array(aux)
-            plt.draw()
-
-    def _refresh_all(self):
-        pass
-
-    def _refresh_lattice(self):
-        pass
-
-    def _refresh_energy(self):
-        pass
-
-    def _refresh_magnet(self):
-        pass
-
-    def plot_energy(self, **kargs):
-        params = {'xlim': (0, self._flips)}
-        params.update(kargs)
-        fig = plt.figure()
-        self._plot_energy(fig, 111, **params)
-        plt.show()
-
-    def test(self, active=True):
-        if not self._active_view:
-            self.view()
-        self._test_mode = active
-
-        if active:
-            self._connect_event('button_press_event')
-            self._connect_event('motion_notify_event')
-        else:
-            self._disconnect_event('button_press_event')
-            self._disconnect_event('motion_notify_event')
-            self._refresh()
-
-    def _connect_event(self, *args, **kargs):
-        # Eventos y funciones correspondientes por defecto
-        events = {'close_event': lambda evt: self._close_view(evt),
-                  'button_press_event': lambda evt: self._onclick(evt),
-                  'motion_notify_event': lambda evt: self._onmotion(evt)}
-
-        # Casos donde recibe solo el nombre del evento
-        for element in args:
-            event = element
-            function = events[event]
-            self._fig.canvas.mpl_connect(event, function)
-            self._events[event] = self._fig.canvas.mpl_connect(event, function)
-
-        # Casos donde recibe el evento y una nueva función a ejecutar
-        for event, function in kargs.items():
-            self._events[event] = self._fig.canvas.mpl_connect(event, function)
-
-    def _disconnect_event(self, *args):
-        for event in args:
-            event_id = self._events[event]
-            self._fig.canvas.mpl_disconnect(event_id)
-
-    def _close_view(self, evt):
-        # Detecta el cierre de la ventana
-        self._active_view = False
-
-    def _onclick(self, evt):
-        if evt.button == 1:
-            self._current_idx = int(evt.xdata+0.5) + int(evt.ydata+0.5) * self._n
-            self.accept_flip(self._current_idx)
-        elif evt.button == 3:
-            self._current_idx = int(evt.xdata+0.5) + int(evt.ydata+0.5) * self._n
-            cost = self.cost(self._current_idx)
-            energy = self.calc_energy(self._current_idx)
-            magnet = self.calc_magnet(self._current_idx)
-            print('cost:   ' + str(cost))
-            print('energy: ' + str(energy))
-            print('magnet: ' + str(magnet))
-
-    def _onmotion(self, evt):
-        self._mask = np.ones(self._n**2, dtype=bool)
-        if evt.inaxes != self._d_lat.axes: return
-        idx = int(evt.xdata+0.5) + int(evt.ydata+0.5) * self._n
-        W, N, E, S = self.find_neighbors(idx)
-        self._mask[W] = False
-        self._mask[N] = False
-        self._mask[E] = False
-        self._mask[S] = False
-        self._refresh()
-
-    def autocorrelate(x):
-        fftx = npfft.fft(x)
-        fftx_mean = np.mean(fftx)
-        fftx_std = np.std(fftx)
-
-        ffty = np.conjugate(fftx)
-        ffty_mean = np.mean(ffty)
-        ffty_std = np.std(ffty)
-
-        result = np.fft.ifft((fftx - fftx_mean) * (ffty - ffty_mean))
-        result = np.fft.fftshift(result)
-        return [i / (fftx_std * ffty_std) for i in result.real]
-
-
-class Lattice2():
-    def __init__(self):
-        pass
-
-    def fill_random(self):
-        pass
-
-    def matrix_form(self):
-        pass
-
-    def calc_energy(self):
-        pass
-
-    def calc_magnet(self):
-        pass
-
-    def calc_all(self):
-        pass
+    def run(self):
+        nflips = self.__metropolis(self, self._step_size)
+        self._update()
+        return nflips

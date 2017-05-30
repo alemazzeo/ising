@@ -25,13 +25,18 @@ class LivePlot():
                 dataset, = subplot._ax.plot(curve.xdata, curve.ydata,
                                             *curve._args, **curve._kwargs)
                 self._plots[name] = dataset
+            for name, mat in subplot._mats.items():
+                dataset = subplot._ax.matshow(mat._data, *mat._args, **mat._kwargs)
+                self._matplots[name] = dataset
 
     def _update(self):
         for name, subplot in self._subplots.items():
             for name, curve in subplot._curves.items():
                 self._plots[name].set_data(curve.xdata, curve.ydata)
-            subplot._ax.relim()
-            subplot._ax.autoscale()
+                subplot._ax.relim()
+                subplot._ax.autoscale()
+            for name, mat in subplot._mats.items():
+                self._matplots[name].set_data(mat.data)
         plt.draw()
 
     def _connect_event(self, **kargs):
@@ -58,6 +63,7 @@ class Subplot():
         self._args = args
         self._kargs = kargs
         self._curves = dict()
+        self._mats = dict()
         self._ax = None
 
     def plot(self, curve, *args, **kwargs):
@@ -65,7 +71,7 @@ class Subplot():
         curve._connect(self, *args, **kwargs)
 
     def matshow(self, curve, **config):
-        self._curves.update({curve._name: curve})
+        self._mats.update({curve._name: curve})
         curve._connect(self, **config)
 
     def _update(self):
@@ -77,6 +83,7 @@ class Curve():
         self._data = None
         self._xdata = None
         self._ydata = None
+        self._mat = None
         self._args = None
         self._kwargs = None
         self._subplots = dict()
@@ -93,14 +100,15 @@ class Curve():
     @data.setter
     def data(self, value):
         if isinstance(value, np.ndarray):
-            data = value
+            d = value
         else:
-            data = np.array(value)
-        if len(data.shape) == 1:
-            self.ydata = data
-        elif len(data.shape) == 2:
-            self.xdata = data[0]
-            self.ydata = data[1]
+            d = np.array(value)
+        self._data = d
+        if len(d.shape) == 1:
+            self.ydata = d
+        elif len(d.shape) == 2:
+            self.xdata = d[0]
+            self.ydata = d[1]
 
     @property
     def xdata(self):
@@ -122,7 +130,6 @@ class Curve():
     @ydata.setter
     def ydata(self, value):
         self._ydata = np.array(value)
-        self._data = self._ydata
         self._update()
 
     def _update(self):
@@ -141,4 +148,10 @@ class Curve():
         self._quickplot = LivePlot(self._name + ' preview')
         self._quickax = self._quickplot.add_subplot(self._name, 111)
         self._quickax.plot(self, *args, **kargs)
+        self._quickplot.show()
+
+    def matshow(self, *args, **kargs):
+        self._quickplot = LivePlot(self._name + ' preview')
+        self._quickax = self._quickplot.add_subplot(self._name, 111)
+        self._quickax.matshow(self, *args, **kargs)
         self._quickplot.show()

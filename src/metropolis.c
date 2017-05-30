@@ -66,11 +66,11 @@ int info(Lattice *self)
 
 int metropolis(Lattice *self, int steps)
 {
-    int i, idx, nflips = 0;
+    int idx, nflips = 0;
 
     self -> _flips = 0;
     // Realiza el número de pasos requerido
-    for(i=0; i<steps; i++)
+    while(nflips < steps)
     {
         // Pide la posición de un spin al azar
         idx = pick_site(self);
