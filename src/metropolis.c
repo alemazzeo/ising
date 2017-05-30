@@ -14,6 +14,9 @@ int init(Lattice *self, int n)
 
     self -> _aligned = 0;
 
+    self -> _current_energy = 0.0;
+    self -> _current_magnet = 0;
+
     *(self -> _p_energy) = 0.0;
     *(self -> _p_magnet) = 0;
     return 0;
@@ -64,20 +67,24 @@ int info(Lattice *self)
     return 0;
 }
 
-int metropolis(Lattice *self, int steps)
+int metropolis(Lattice *self, int ntry)
 {
-    int idx, nflips = 0;
-
+    int i, idx;
     self -> _flips = 0;
+
     // Realiza el número de pasos requerido
-    while(nflips < steps)
+    for (i=0;i<ntry;i++)
     {
         // Pide la posición de un spin al azar
         idx = pick_site(self);
         // Trata de dar vuelta el spin
-        nflips += flip(self, idx);
+        if (flip(self, idx))
+	{
+	    self -> _p_energy[self -> _flips] = self -> _current_energy;
+	    self -> _p_magnet[self -> _flips] = self -> _current_magnet;
+	}
     }
-    return nflips;
+    return self -> _flips;
 }
 
 int pick_site(Lattice *self)
@@ -175,23 +182,23 @@ int accept_flip(Lattice *self, int idx, int aligned)
     // Calcula los cambios
     if (self -> _p_lattice[idx] > 0)
     {
-	newE = ((self -> _p_energy[self -> _flips]) +
-		(self -> _p_dEs[aligned]));
-	newM = self -> _p_magnet[self -> _flips] + 2;
+	newE = (self -> _current_energy +
+		self -> _p_dEs[aligned]);
+	newM = self -> _current_magnet + 2;
     }
     else
     {
-	newE = ((self -> _p_energy[self -> _flips]) +
-		(self -> _p_dEs[aligned+5]));
-	newM = self -> _p_magnet[self -> _flips] - 2;
+	newE = (self -> _current_energy +
+		self -> _p_dEs[aligned+5]);
+	newM = self -> _current_magnet - 2;
     }
     // Aumenta el contador de flips
     self -> _flips += 1;
     self -> _total_flips += 1;
     // Actualiza la energía
-    self -> _p_energy[self -> _flips] = newE;
+    self -> _current_energy = newE;
     // Actualiza la magnetización
-    self -> _p_magnet[self -> _flips] = newM;
+    self -> _current_magnet = newM;
     return 0;
 }
 
@@ -230,11 +237,14 @@ int calc_lattice(Lattice *self)
 {
     int i;
 
+    self -> _current_energy = 0;
+    self -> _current_magnet = 0;
+
     // Recorre la red actualizando los valores de E y M
     for (i=0; i< self->_n2; i++)
     {
-        self -> _p_energy[self -> _flips] += calc_energy(self, i);
-        self -> _p_magnet[self -> _flips] += calc_magnet(self, i);
+        self -> _current_energy += calc_energy(self, i);
+        self -> _current_magnet += calc_magnet(self, i);
     }
     return 0;
 }

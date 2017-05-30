@@ -10,14 +10,23 @@ lat.fill_random()
 lat.step_size = 50000
 lat.T = 5.0
 lat.run()
-lat.lattice.matshow()
-lat.energy.plot()
-lat.magnet.plot()
+#lat.lattice.matshow()
+#lat.energy.plot()
+#lat.magnet.plot()
 
-m = list()
-lat.step_size = 100
-for i in range (100):
-    lat.T = lat.T - 0.1
-    m.append(lat._magnet[-1])
-    lat.run()
-    plt.pause(0.0001)
+ti = 5
+tf = 0.5
+temp_paso = -0.05
+temps = np.arange(ti, tf, temp_paso)
+
+n_samples = 10000
+magnet = np.zeros([len(temps),n_samples])
+
+lat.step_size = 10000
+for i, T in enumerate(temps):
+    lat.T = T
+    print(str(T) + ' '*20, end='\r')
+    for j in range(n_samples):
+        lat.run()
+        magnet[i][j] = lat.current_magnet
+    #plt.pause(0.0001)

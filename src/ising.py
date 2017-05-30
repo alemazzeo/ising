@@ -21,6 +21,8 @@ class Lattice(C.Structure):
                 ("_E", C.c_int),
                 ("_S", C.c_int),
                 ("_aligned", C.c_int),
+                ("_current_energy", C.c_float),
+                ("_current_magnet", C.c_int),
                 ("_p_energy", C.POINTER(C.c_float)),
                 ("_p_magnet", C.POINTER(C.c_int))]
 
@@ -103,9 +105,6 @@ class Lattice(C.Structure):
             J = self._J
         if B is None:
             B = self._B
-        print (T)
-        print (J)
-        print (B)
         self.__set_params(self, T, J, B)
 
     @property
@@ -131,6 +130,14 @@ class Lattice(C.Structure):
 
     @property
     def step_size(self): return self._step_size
+
+    @property
+    def current_magnet(self): 
+        return self._current_magnet
+
+    @property
+    def current_energy(self): 
+        return self._current_energy
 
     @step_size.setter
     def step_size(self, value):

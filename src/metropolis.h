@@ -13,6 +13,8 @@ struct _lat
     float _p_exps[10];
     int   _W, _N, _E, _S;
     int   _aligned;
+    float _current_energy;
+    int   _current_magnet;
     float *_p_energy;
     int   *_p_magnet;
 };

@@ -37,6 +37,7 @@ class LivePlot():
                 subplot._ax.autoscale()
             for name, mat in subplot._mats.items():
                 self._matplots[name].set_data(mat.data)
+        plt.figure(self._fig.number)
         plt.draw()
 
     def _connect_event(self, **kargs):
