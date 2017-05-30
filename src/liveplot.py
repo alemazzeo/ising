@@ -84,8 +84,8 @@ class Curve():
         self._xdata = None
         self._ydata = None
         self._mat = None
-        self._args = None
-        self._kwargs = None
+        self._args = list()
+        self._kwargs = dict()
         self._subplots = dict()
         self._quickplot = None
         self._quickax = None
@@ -138,11 +138,14 @@ class Curve():
 
     def _connect(self, subplot, *args, **kwargs):
         self._args = args
-        self._kwargs = kwargs
+        self._kwargs.update(kwargs)
         self._subplots.update({subplot._name: subplot})
 
     def _disconnect(self, subplot):
         self._subplots.pop(subplot._name)
+
+    def preset(self, **kwargs):
+        self._kwargs.update(kwargs)
 
     def plot(self, *args, **kargs):
         self._quickplot = LivePlot(self._name + ' preview')

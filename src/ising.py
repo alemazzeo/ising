@@ -83,6 +83,7 @@ class Lattice(C.Structure):
 
         # Curvas para liveplot
         self.lattice = Curve('Lattice')
+        self.lattice.preset(vmin=-1, vmax=1, cmap='gray')
         self.energy = Curve('Energy')
         self.magnet = Curve('Magnetization')
 
