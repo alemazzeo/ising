@@ -7,6 +7,7 @@ class NumpyPlot(np.ndarray):
         obj = np.asarray(input_array).view(cls)
         obj._plot_config = dict()
         obj._plot_config.update(plotconfig)
+        obj._plot_data = None
         obj.figure = None
         obj.subplot = None
         obj._events = {'close_event': None,
@@ -17,42 +18,47 @@ class NumpyPlot(np.ndarray):
 
     def set_figure(self, *args, **kwargs):
         self.figure = plt.figure(*args, **kwargs)
-        self.figure.clear()
+        plt.ion()
 
     def add_subplot(self, *args, **kwargs):
         if self.figure is not None:
-            self.figure.add_subplot(*args, **kwargs)
+            self.subplot = self.figure.add_subplot(*args, **kwargs)
 
     def _exist_figure(self):
         if self.figure is None:
             self.set_figure()
-            plt.ion()
             self._active = True
-            self.connect_event(close_event=self._on_close)
+            self.connect_event(close_event= lambda evt: self._on_close(evt))
+
+    def _exist_subplot(self):
+        if self.subplot is None:
+            self.add_subplot(111)
 
     def plot(self, *args, **kwargs):
         self._exist_figure()
-        if self.subplot is None:
-            plt.plot(self, *args, **kwargs)
-        else:
-            self.subplot.plot(self, *args, **kwargs)
+        self._exist_subplot()
+
+        self._plot_data, = self.subplot.plot(self, *args, **kwargs)
         self._update()
 
     def matshow(self, *args, **kwargs):
         self._exist_figure()
-        if self.subplot is None:
-            plt.matshow(self, *args, **kwargs)
-        else:
-            self.subplot.matshow(self, *args, **kwargs)
+        self._exist_subplot()
+        self._plot_data, = self.subplot.matshow(self, *args, **kwargs)
         self._update()
 
     def _update(self):
         if self._active:
+            self._plot_data.set_xdata(np.arange(len(self)))
+            self._plot_data.set_ydata(self)
+            self.subplot.relim()
+            self.subplot.autoscale()
             plt.figure(self.figure.number)
             plt.draw()
 
     def __array_wrap__(self, out_arr, context=None):
         self._update()
+        return np.ndarray.__array_wrap__(self, out_arr, context)
 
     def _on_close(self, evt):
         self._active = False
