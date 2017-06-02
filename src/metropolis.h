@@ -21,10 +21,28 @@ struct _lat
 
 typedef struct _lat Lattice;
 
+struct _result
+{
+	int   _sample_size;
+	int   _step_size;
+	float _tolerance;
+	float _T, _J, _B;
+	float *_p_energy;
+	int   *_p_magnet;
+	int   *_p_flips;
+	int   *_p_total_flips;
+	float *_p_q;
+};
+
+typedef struct _result Result;
+
 int   init            (Lattice *self, int n);
 int   set_params      (Lattice *self, float T, float J, float B);
 int   info            (Lattice *self);
-int   metropolis      (Lattice *self, int pasos);
+int   metropolis      (Lattice *self);
+int   run             (Lattice *self, int ntry);
+float run_until       (Lattice *self, int steps, float tolerance);
+int   run_sample      (Lattice *self, Result *results);
 int   pick_site       (Lattice *self);
 int   flip            (Lattice *self, int idx);
 int   find_neighbors  (Lattice *self, int idx);

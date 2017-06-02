@@ -4,29 +4,48 @@ from liveplot import LivePlot, Curve
 from ising import Lattice
 import time
 
-lat = Lattice(32)
-lat.fill_random()
+# Setup
 
-lat.step_size = 50000
-lat.T = 5.0
-lat.run()
-#lat.lattice.matshow()
-#lat.energy.plot()
-#lat.magnet.plot()
+lat_size = 32
 
-ti = 5
+J = 1.0
+B = 0.0
+
+ti = 3.0
 tf = 0.5
 temp_paso = -0.05
 temps = np.arange(ti, tf, temp_paso)
+samples = list()
 
-n_samples = 10000
-magnet = np.zeros([len(temps),n_samples])
+sample_size = 10000
 
-lat.step_size = 10000
-for i, T in enumerate(temps):
+preterm = 50000
+term = 10000
+step = 1500
+
+# Initialization
+
+lat = Lattice(lat_size)
+lat.fill_random()
+
+lat.J = J
+lat.B = B
+lat.T = ti
+
+# Pretermalization
+
+lat.run_until(preterm)
+
+# Collecting samples
+
+for T in np.nditer(temps):
+    print('T= ' + str(T) + ' '*10, end='\r')
+
+    # Set T and run until termalization
     lat.T = T
-    print(str(T) + ' '*20, end='\r')
-    for j in range(n_samples):
-        lat.run()
-        magnet[i][j] = lat.current_magnet
-    #plt.pause(0.0001)
+    lat.run_until(term)
+
+    # Fill a sample
+    sample = lat.run_sample(sample_size, step)
+    # Store sample in a list
+    samples.append(sample)

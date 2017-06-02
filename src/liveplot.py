@@ -1,5 +1,4 @@
 import numpy as np
-import ctypes as C
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
@@ -15,9 +14,12 @@ class LivePlot():
                         'button_press_event': None,
                         'motion_notify_event': None}
 
+        self._active = False
+
     def show(self):
         plt.ion()
         self._fig = plt.figure(self._name)
+        self._connect_event(close_event=self.stop)
 
         for name, subplot in self._subplots.items():
             subplot._ax = self._fig.add_subplot(*subplot._args, **subplot._kargs)
@@ -29,20 +31,26 @@ class LivePlot():
                 dataset = subplot._ax.matshow(mat._data, *mat._args, **mat._kwargs)
                 self._matplots[name] = dataset
 
+        self._active = True
+
+    def stop(self):
+        self._active = False
+
     def _update(self):
-        for name, subplot in self._subplots.items():
-            for name, curve in subplot._curves.items():
-                self._plots[name].set_data(curve.xdata, curve.ydata)
-                subplot._ax.relim()
-                subplot._ax.autoscale()
-            for name, mat in subplot._mats.items():
-                self._matplots[name].set_data(mat.data)
-        plt.figure(self._fig.number)
-        plt.draw()
+        if self._active:
+            for name, subplot in self._subplots.items():
+                for name, curve in subplot._curves.items():
+                    self._plots[name].set_data(curve.xdata, curve.ydata)
+                    subplot._ax.relim()
+                    subplot._ax.autoscale()
+                for name, mat in subplot._mats.items():
+                    self._matplots[name].set_data(mat.data)
+            plt.figure(self._fig.number)
+            plt.draw()
 
     def _connect_event(self, **kargs):
         for event, function in kargs.items():
-            self._events[event] = self._figure.canvas.mpl_connect(event, function)
+            self._events[event] = self._fig.canvas.mpl_connect(event, function)
 
     def _disconnect_event(self, *args):
         for event in args:

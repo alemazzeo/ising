@@ -1,9 +1,54 @@
 import numpy as np
+from scipy.optimize import curve_fit
+from scipy.stats import gaussian_kde
 import ctypes as C
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from liveplot import LivePlot, Curve
 import time
+
+class Result(C.Structure):
+    _fields_ = [("_sample_size", C.c_int),
+                ("_step_size", C.c_int),
+                ("_tolerance", C.c_float),
+                ("_T", C.c_float),
+                ("_J", C.c_float),
+                ("_B", C.c_float),
+                ("_p_energy", C.POINTER(C.c_float)),
+                ("_p_magnet", C.POINTER(C.c_int)),
+                ("_p_flips", C.POINTER(C.c_int)),
+                ("_p_total_flips", C.POINTER(C.c_int)),
+                ("_p_q", C.POINTER(C.c_float))]
+
+    def __init__(self, sample_size, step_size=None, tolerance=None,
+                 path='../datos/', filename=None):
+
+        self._sample_size = sample_size
+        self._step_size = step_size
+        self._tolerance = tolerance
+        self._path = path
+        self._filename = filename
+
+        # Memoria asignada
+        self._energy = np.zeros(self._sample_size, dtype=C.c_float)
+        self._magnet = np.zeros(self._sample_size, dtype=C.c_int)
+        self._flips = np.zeros(self._sample_size, dtype=C.c_int)
+        self._total_flips = np.zeros(self._sample_size, dtype=C.c_int)
+        self._q = np.zeros(self._sample_size, dtype=C.c_float)
+
+        # Punteros
+        self._p_energy = self._energy.ctypes.data_as(C.POINTER(C.c_float))
+        self._p_magnet = self._magnet.ctypes.data_as(C.POINTER(C.c_int))
+        self._p_flips = self._flips.ctypes.data_as(C.POINTER(C.c_int))
+        self._p_total_flips = self._total_flips.ctypes.data_as(C.POINTER(C.c_int))
+        self._p_q = self._q.ctypes.data_as(C.POINTER(C.c_float))
+
+    def pdf(self):
+        self._pdf_energy = gaussian_kde(self._energy)
+        self._pdf_magnet = gaussian_kde(self._magnet)
+        self._pdf_flips = gaussian_kde(self._flips)
+        self._pdf_q = gaussian_kde(self._q)
+
 
 class Lattice(C.Structure):
     _fields_ = [("_p_lattice", C.POINTER(C.c_int)),
@@ -35,6 +80,9 @@ class Lattice(C.Structure):
         self.__set_params = self._lib.set_params
         self.__info = self._lib.info
         self.__metropolis = self._lib.metropolis
+        self.__run = self._lib.run
+        self.__run_until = self._lib.run_until
+        self.__run_sample = self._lib.run_sample
         self.__pick_site = self._lib.pick_site
         self.__flip = self._lib.flip
         self.__find_neighbors = self._lib.find_neighbors
@@ -50,6 +98,9 @@ class Lattice(C.Structure):
         self.__set_params.restype = C.c_int
         self.__info.restype = C.c_int
         self.__metropolis.restype = C.c_int
+        self.__run.restype = C.c_int
+        self.__run_until.restype = C.c_float
+        self.__run_sample.restype = C.c_int
         self.__pick_site.restype = C.c_int
         self.__flip.restype = C.c_int
         self.__find_neighbors.restype = C.c_int
@@ -65,6 +116,9 @@ class Lattice(C.Structure):
         self.__set_params.argtypes = [C.POINTER(Lattice), C.c_float, C.c_float, C.c_float]
         self.__info.argtypes = [C.POINTER(Lattice)]
         self.__metropolis.argtypes = [C.POINTER(Lattice), C.c_int]
+        self.__run.argtypes = [C.POINTER(Lattice), C.c_int]
+        self.__run_until.argtypes = [C.POINTER(Lattice), C.c_int, C.c_float]
+        self.__run_sample.argtypes = [C.POINTER(Lattice), C.POINTER(Result)]
         self.__pick_site.argtypes = [C.POINTER(Lattice)]
         self.__flip.argtypes = [C.POINTER(Lattice), C.c_int]
         self.__find_neighbors.argtypes = [C.POINTER(Lattice), C.c_int]
@@ -132,11 +186,11 @@ class Lattice(C.Structure):
     def step_size(self): return self._step_size
 
     @property
-    def current_magnet(self): 
+    def current_magnet(self):
         return self._current_magnet
 
     @property
-    def current_energy(self): 
+    def current_energy(self):
         return self._current_energy
 
     @step_size.setter
@@ -148,12 +202,6 @@ class Lattice(C.Structure):
             self._magnet = np.zeros(self._step_size, dtype=C.c_int)
             self._p_magnet = self._magnet.ctypes.data_as(C.POINTER(C.c_int))
 
-    @property
-    def max_ntry(self): return self._max_ntry
-
-    @max_ntry.setter
-    def max_ntry(self, value): self._max_ntry = value
-
     def _update(self):
         self.lattice.data = np.copy(self._lattice).reshape([self._n, self._n])
         self.energy.data = self._energy[0:self._flips]
@@ -162,6 +210,7 @@ class Lattice(C.Structure):
     def fill_random(self, prob=0.5):
         self._lattice[np.random.rand(self._n**2) > prob] *= -1
         self.lattice.data = np.copy(self._lattice).reshape([self._n, self._n])
+        self.calc_lattice()
 
     def pick_site(self):
         return self.__pick_site(self)
@@ -187,7 +236,23 @@ class Lattice(C.Structure):
     def calc_lattice(self):
         self.__calc_lattice(self)
 
-    def run(self):
-        nflips = self.__metropolis(self, self._step_size)
+    def run(self, step_size=None):
+        if step_size is not None:
+            self.step_size = step_size
+        nflips = self.__run(self, self.step_size)
         self._update()
         return nflips
+
+    def run_until(self, step_size=None, tolerance=10.0):
+        if step_size is not None:
+            self.step_size = step_size
+        q = self.__run_until(self, self.step_size, tolerance)
+        self._update()
+        return q
+
+    def run_sample(self, sample_size, step_size=None, tolerance=10.0):
+        if step_size is not None:
+            self.step_size = step_size
+        data = Result(sample_size, self.step_size, tolerance)
+        self.__run_sample(self, data)
+        return data

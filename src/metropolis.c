@@ -67,24 +67,80 @@ int info(Lattice *self)
     return 0;
 }
 
-int metropolis(Lattice *self, int ntry)
+
+int metropolis(Lattice *self)
 {
-    int i, idx;
+	int idx;
+
+	// Pide la posición de un spin al azar
+	do
+		idx = pick_site(self);
+	while(idx==self -> _n2);
+	// Trata de dar vuelta el spin y devuelve el resultado
+	return flip(self, idx);
+}
+
+int run(Lattice *self, int ntry)
+{
+    int i;
     self -> _flips = 0;
 
     // Realiza el número de pasos requerido
     for (i=0;i<ntry;i++)
     {
-        // Pide la posición de un spin al azar
-        idx = pick_site(self);
-        // Trata de dar vuelta el spin
-        if (flip(self, idx))
-	{
-	    self -> _p_energy[self -> _flips] = self -> _current_energy;
-	    self -> _p_magnet[self -> _flips] = self -> _current_magnet;
-	}
+        if (metropolis(self))
+		{
+			self -> _p_energy[self -> _flips] = self -> _current_energy;
+			self -> _p_magnet[self -> _flips] = self -> _current_magnet;
+		}
     }
     return self -> _flips;
+}
+
+float run_until(Lattice *self, int steps, float tolerance)
+{
+	int accept = 0, reject=0;
+	self -> _flips = 0;
+	while (accept < steps && (reject - accept) < tolerance * steps)
+	{
+		if (metropolis(self))
+		{
+			self -> _p_energy[self -> _flips] = self -> _current_energy;
+			self -> _p_magnet[self -> _flips] = self -> _current_magnet;
+			accept++;
+		}
+		else
+		{
+			reject++;
+		}
+	}
+	return (float)(accept - reject) / (accept + reject);
+}
+
+int run_sample(Lattice *self, Result *result)
+{
+	int i, size, step_size;
+	float q, tolerance;
+
+	size = (result -> _sample_size);
+
+	result -> _T = self -> _T;
+	result -> _J = self -> _J;
+	result -> _B = self -> _B;
+
+	step_size = result -> _step_size;
+	tolerance = result -> _tolerance;
+
+	for (i=0; i<size; i++)
+	{
+		q = run_until(self, step_size, tolerance);
+		result -> _p_magnet[i] = self -> _current_magnet;
+		result -> _p_energy[i] = self -> _current_energy;
+		result -> _p_flips[i] = self -> _flips;
+		result -> _p_total_flips[i] = self -> _total_flips;
+		result -> _p_q[i] = q;
+	}
+	return size;
 }
 
 int pick_site(Lattice *self)
@@ -148,13 +204,13 @@ int cost(Lattice *self, int idx)
 
     // (4, 2, 0, -2, 4) / 2 + 2 --> (4, 3, 2, 1, 0)
     self -> _aligned = ((self -> _p_lattice[self -> _W]) *
-			(self -> _p_lattice[idx]) +
-			(self -> _p_lattice[self -> _N]) *
-			(self -> _p_lattice[idx]) +
-			(self -> _p_lattice[self -> _E]) *
-			(self -> _p_lattice[idx]) +
-			(self -> _p_lattice[self -> _S]) *
-			(self -> _p_lattice[idx])) / 2 + 2;
+						(self -> _p_lattice[idx]) +
+						(self -> _p_lattice[self -> _N]) *
+						(self -> _p_lattice[idx]) +
+						(self -> _p_lattice[self -> _E]) *
+						(self -> _p_lattice[idx]) +
+						(self -> _p_lattice[self -> _S]) *
+						(self -> _p_lattice[idx])) / 2 + 2;
 
     return self -> _aligned;
 }
@@ -182,15 +238,15 @@ int accept_flip(Lattice *self, int idx, int aligned)
     // Calcula los cambios
     if (self -> _p_lattice[idx] > 0)
     {
-	newE = (self -> _current_energy +
-		self -> _p_dEs[aligned]);
-	newM = self -> _current_magnet + 2;
+		newE = ((self -> _current_energy) +
+				(self -> _p_dEs[aligned]));
+		newM = (self -> _current_magnet) + 2;
     }
     else
     {
-	newE = (self -> _current_energy +
-		self -> _p_dEs[aligned+5]);
-	newM = self -> _current_magnet - 2;
+		newE = ((self -> _current_energy) +
+				(self -> _p_dEs[aligned+5]));
+		newM = (self -> _current_magnet) - 2;
     }
     // Aumenta el contador de flips
     self -> _flips += 1;
@@ -205,10 +261,10 @@ int accept_flip(Lattice *self, int idx, int aligned)
 float calc_pi(Lattice *self, int idx, int aligned)
 {
     if (self -> _p_lattice[idx] < 0)
-	// Si al cambiar el spin se alinea con B
-	return self -> _p_exps[aligned];
+		// Si al cambiar el spin se alinea con B
+		return self -> _p_exps[aligned];
     else
-	// Si al cambiar el spin queda en contra de B
+		// Si al cambiar el spin queda en contra de B
         return self -> _p_exps[aligned+5];
 }
 
@@ -220,11 +276,11 @@ float calc_energy(Lattice *self, int idx)
     opposites = 4 - cost(self, idx);
 
     if (self -> _p_lattice[idx] > 0)
-	// Si al cambiar el spin se alinea con B
-	return self -> _p_dEs[opposites] / 2;
+		// Si al cambiar el spin se alinea con B
+		return self -> _p_dEs[opposites] / 2;
     else
-	// Si al cambiar el spin queda en contra de B
-	return self -> _p_dEs[opposites] / 2;
+		// Si al cambiar el spin queda en contra de B
+		return self -> _p_dEs[opposites] / 2;
 }
 
 int calc_magnet(Lattice *self, int idx)
@@ -260,12 +316,12 @@ int autocorrelation(float *x, float *result, int n, float xt, float xt2)
 
     for (k=0; k<n; k++)
     {
-	sum = 0.0;
-	for (j=0; j<n-k; j++)
-	{
-	    sum += (x[j] - (xt / n)) * (x[j+k] - (xt / n));
-	}
-	result[k] = sum / ((n - k) * sd);
+		sum = 0.0;
+		for (j=0; j<n-k; j++)
+		{
+			sum += (x[j] - (xt / n)) * (x[j+k] - (xt / n));
+		}
+		result[k] = sum / ((n - k) * sd);
     }
     return 0;
 }

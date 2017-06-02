@@ -44,7 +44,7 @@ int main(int argc, char **argv)
     printf("Iteraciones: %d x %d\n", niter, pasos);
 
     for (int i = 0; i < niter; i++) {
-		metropolis(ising, pasos);
+		metropolis(ising);
     }
 
     print_lattice(ising -> _p_lattice, n);
