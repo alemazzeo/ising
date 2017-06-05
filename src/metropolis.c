@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <math.h>
 
-int init(Lattice *self, int n)
+int init(Ising *self, int n)
 {
     self -> _n = n;
     self -> _n2 = n * n;
@@ -22,7 +22,7 @@ int init(Lattice *self, int n)
     return 0;
 }
 
-int set_params(Lattice *self, float T, float J, float B)
+int set_params(Ising *self, float T, float J, float B)
 {
     self -> _T = T;
     self -> _J = J;
@@ -55,7 +55,7 @@ int set_params(Lattice *self, float T, float J, float B)
     return 0;
 }
 
-int info(Lattice *self)
+int info(Ising *self)
 {
     printf("Size: %d\n", self -> _n);
     printf("T: %f\n", self -> _T);
@@ -68,7 +68,7 @@ int info(Lattice *self)
 }
 
 
-int metropolis(Lattice *self)
+int metropolis(Ising *self)
 {
 	int idx;
 
@@ -80,7 +80,7 @@ int metropolis(Lattice *self)
 	return flip(self, idx);
 }
 
-int run(Lattice *self, int ntry)
+int run(Ising *self, int ntry)
 {
     int i;
     self -> _flips = 0;
@@ -97,7 +97,7 @@ int run(Lattice *self, int ntry)
     return self -> _flips;
 }
 
-float run_until(Lattice *self, int steps, float tolerance)
+float run_until(Ising *self, int steps, float tolerance)
 {
 	int accept = 0, reject=0;
 	self -> _flips = 0;
@@ -117,7 +117,7 @@ float run_until(Lattice *self, int steps, float tolerance)
 	return (float)(accept - reject) / (accept + reject);
 }
 
-int run_sample(Lattice *self, Result *result)
+int run_sample(Ising *self, Sample *result)
 {
 	int i, size, step_size;
 	float q, tolerance;
@@ -143,13 +143,13 @@ int run_sample(Lattice *self, Result *result)
 	return size;
 }
 
-int pick_site(Lattice *self)
+int pick_site(Ising *self)
 {
     // Elige un spin al azar y devuelve su posición
     return (int) (((float) rand() / RAND_MAX) * (self -> _n2));
 }
 
-int flip(Lattice *self, int idx)
+int flip(Ising *self, int idx)
 {
     int aligned;
     float pi;
@@ -178,7 +178,7 @@ int flip(Lattice *self, int idx)
 }
 
 
-int find_neighbors(Lattice *self, int idx)
+int find_neighbors(Ising *self, int idx)
 {
 
     int n, n2;
@@ -198,7 +198,7 @@ int find_neighbors(Lattice *self, int idx)
     return 0;
 }
 
-int cost(Lattice *self, int idx)
+int cost(Ising *self, int idx)
 {
     // Cuenta los spins en contra (costo del flip)
 
@@ -215,7 +215,7 @@ int cost(Lattice *self, int idx)
     return self -> _aligned;
 }
 
-int try_flip(Lattice *self, float pi)
+int try_flip(Ising *self, float pi)
 {
     if (pi > 1)
     {
@@ -230,7 +230,7 @@ int try_flip(Lattice *self, float pi)
     }
 }
 
-int accept_flip(Lattice *self, int idx, int aligned)
+int accept_flip(Ising *self, int idx, int aligned)
 {
     float newE, newM;
     // Realiza el flip
@@ -258,7 +258,7 @@ int accept_flip(Lattice *self, int idx, int aligned)
     return 0;
 }
 
-float calc_pi(Lattice *self, int idx, int aligned)
+float calc_pi(Ising *self, int idx, int aligned)
 {
     if (self -> _p_lattice[idx] < 0)
 		// Si al cambiar el spin se alinea con B
@@ -268,7 +268,7 @@ float calc_pi(Lattice *self, int idx, int aligned)
         return self -> _p_exps[aligned+5];
 }
 
-float calc_energy(Lattice *self, int idx)
+float calc_energy(Ising *self, int idx)
 {
     int opposites = 0;
 
@@ -283,13 +283,13 @@ float calc_energy(Lattice *self, int idx)
 		return self -> _p_dEs[opposites] / 2;
 }
 
-int calc_magnet(Lattice *self, int idx)
+int calc_magnet(Ising *self, int idx)
 {
     // Devuelve el valor del spin para calcular la magnetización
     return self -> _p_lattice[idx];
 }
 
-int calc_lattice(Lattice *self)
+int calc_lattice(Ising *self)
 {
     int i;
 
@@ -305,23 +305,28 @@ int calc_lattice(Lattice *self)
     return 0;
 }
 
-int autocorrelation(float *x, float *result, int n, float xt, float xt2)
+int autocorrelation(float *x, float *result, int n)
 {
-    int j, k;
     float sum = 0.0;
-    float mean = 0.0, sd = 0.0;
+    float mean = 0.0, sd2 = 0.0;
 
-    mean = xt / n;
-    sd = (xt2 / n) - (mean * mean);
+	for (int i=0; i<n; i++)
+	{
+		mean += x[i];
+		sd2 += x[i]*x[i];
+	}
 
-    for (k=0; k<n; k++)
+	mean = mean / n;
+	sd2 = (sd2 / n) - mean*mean;
+
+    for (int k=0; k<n; k++)
     {
 		sum = 0.0;
-		for (j=0; j<n-k; j++)
+		for (int j=0; j<n-k; j++)
 		{
-			sum += (x[j] - (xt / n)) * (x[j+k] - (xt / n));
+			sum += (x[j] - mean) * (x[j+k] - mean);
 		}
-		result[k] = sum / ((n - k) * sd);
+		result[k] = sum / ((n - k) * sd2);
     }
     return 0;
 }

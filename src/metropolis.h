@@ -1,7 +1,7 @@
 #ifndef METROPOLIS_H
 #define METROPOLIS_H
 
-struct _lat
+struct _ising
 {
     int   *_p_lattice;
     int   _n;
@@ -19,9 +19,9 @@ struct _lat
     int   *_p_magnet;
 };
 
-typedef struct _lat Lattice;
+typedef struct _ising Ising;
 
-struct _result
+struct _sample
 {
 	int   _sample_size;
 	int   _step_size;
@@ -34,24 +34,24 @@ struct _result
 	float *_p_q;
 };
 
-typedef struct _result Result;
+typedef struct _sample Sample;
 
-int   init            (Lattice *self, int n);
-int   set_params      (Lattice *self, float T, float J, float B);
-int   info            (Lattice *self);
-int   metropolis      (Lattice *self);
-int   run             (Lattice *self, int ntry);
-float run_until       (Lattice *self, int steps, float tolerance);
-int   run_sample      (Lattice *self, Result *results);
-int   pick_site       (Lattice *self);
-int   flip            (Lattice *self, int idx);
-int   find_neighbors  (Lattice *self, int idx);
-int   cost            (Lattice *self, int idx);
-int   try_flip        (Lattice *self, float pi);
-int   accept_flip     (Lattice *self, int idx, int aligned);
-float calc_pi         (Lattice *self, int idx, int aligned);
-float calc_energy     (Lattice *self, int idx);
-int   calc_magnet     (Lattice *self, int idx);
-int   calc_lattice    (Lattice *self);
-int   autocorrelation (float *x, float *result, int n, float xt, float xt2);
+int   init            (Ising *self, int n);
+int   set_params      (Ising *self, float T, float J, float B);
+int   info            (Ising *self);
+int   metropolis      (Ising *self);
+int   run             (Ising *self, int ntry);
+float run_until       (Ising *self, int steps, float tolerance);
+int   run_sample      (Ising *self, Sample *sample);
+int   pick_site       (Ising *self);
+int   flip            (Ising *self, int idx);
+int   find_neighbors  (Ising *self, int idx);
+int   cost            (Ising *self, int idx);
+int   try_flip        (Ising *self, float pi);
+int   accept_flip     (Ising *self, int idx, int aligned);
+float calc_pi         (Ising *self, int idx, int aligned);
+float calc_energy     (Ising *self, int idx);
+int   calc_magnet     (Ising *self, int idx);
+int   calc_lattice    (Ising *self);
+int   autocorrelation (float *x, float *result, int n);
 #endif

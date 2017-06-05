@@ -1,56 +1,11 @@
-import numpy as np
-from scipy.optimize import curve_fit
-from scipy.stats import gaussian_kde
+import matplotlib
+matplotlib.use('Qt5Agg')
+
 import ctypes as C
+import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-from liveplot import LivePlot, Curve
-import time
 
-class Result(C.Structure):
-    _fields_ = [("_sample_size", C.c_int),
-                ("_step_size", C.c_int),
-                ("_tolerance", C.c_float),
-                ("_T", C.c_float),
-                ("_J", C.c_float),
-                ("_B", C.c_float),
-                ("_p_energy", C.POINTER(C.c_float)),
-                ("_p_magnet", C.POINTER(C.c_int)),
-                ("_p_flips", C.POINTER(C.c_int)),
-                ("_p_total_flips", C.POINTER(C.c_int)),
-                ("_p_q", C.POINTER(C.c_float))]
-
-    def __init__(self, sample_size, step_size=None, tolerance=None,
-                 path='../datos/', filename=None):
-
-        self._sample_size = sample_size
-        self._step_size = step_size
-        self._tolerance = tolerance
-        self._path = path
-        self._filename = filename
-
-        # Memoria asignada
-        self._energy = np.zeros(self._sample_size, dtype=C.c_float)
-        self._magnet = np.zeros(self._sample_size, dtype=C.c_int)
-        self._flips = np.zeros(self._sample_size, dtype=C.c_int)
-        self._total_flips = np.zeros(self._sample_size, dtype=C.c_int)
-        self._q = np.zeros(self._sample_size, dtype=C.c_float)
-
-        # Punteros
-        self._p_energy = self._energy.ctypes.data_as(C.POINTER(C.c_float))
-        self._p_magnet = self._magnet.ctypes.data_as(C.POINTER(C.c_int))
-        self._p_flips = self._flips.ctypes.data_as(C.POINTER(C.c_int))
-        self._p_total_flips = self._total_flips.ctypes.data_as(C.POINTER(C.c_int))
-        self._p_q = self._q.ctypes.data_as(C.POINTER(C.c_float))
-
-    def pdf(self):
-        self._pdf_energy = gaussian_kde(self._energy)
-        self._pdf_magnet = gaussian_kde(self._magnet)
-        self._pdf_flips = gaussian_kde(self._flips)
-        self._pdf_q = gaussian_kde(self._q)
-
-
-class Lattice(C.Structure):
+class Ising(C.Structure):
     _fields_ = [("_p_lattice", C.POINTER(C.c_int)),
                 ("_n", C.c_int),
                 ("_n2", C.c_int),
@@ -71,7 +26,7 @@ class Lattice(C.Structure):
                 ("_p_energy", C.POINTER(C.c_float)),
                 ("_p_magnet", C.POINTER(C.c_int))]
 
-    def __init__(self, n, data='../datos/'):
+    def __init__(self, n):
 
         # Biblioteca de funciones
         self._lib = C.CDLL('./libising.so')
@@ -93,6 +48,7 @@ class Lattice(C.Structure):
         self.__calc_energy = self._lib.calc_energy
         self.__calc_magnet = self._lib.calc_magnet
         self.__calc_lattice = self._lib.calc_lattice
+        self.__autocorrelation = self._lib.autocorrelation
 
         self.__init.restype = C.c_int
         self.__set_params.restype = C.c_int
@@ -111,37 +67,30 @@ class Lattice(C.Structure):
         self.__calc_energy.restype = C.c_float
         self.__calc_magnet.restype = C.c_int
         self.__calc_lattice.restype = C.c_int
+        self.__autocorrelation.restype = C.c_int
 
-        self.__init.argtypes = [C.POINTER(Lattice), C.c_int]
-        self.__set_params.argtypes = [C.POINTER(Lattice), C.c_float, C.c_float, C.c_float]
-        self.__info.argtypes = [C.POINTER(Lattice)]
-        self.__metropolis.argtypes = [C.POINTER(Lattice), C.c_int]
-        self.__run.argtypes = [C.POINTER(Lattice), C.c_int]
-        self.__run_until.argtypes = [C.POINTER(Lattice), C.c_int, C.c_float]
-        self.__run_sample.argtypes = [C.POINTER(Lattice), C.POINTER(Result)]
-        self.__pick_site.argtypes = [C.POINTER(Lattice)]
-        self.__flip.argtypes = [C.POINTER(Lattice), C.c_int]
-        self.__find_neighbors.argtypes = [C.POINTER(Lattice), C.c_int]
-        self.__cost.argtypes = [C.POINTER(Lattice), C.c_int]
-        self.__try_flip.argtypes = [C.POINTER(Lattice), C.c_float]
-        self.__accept_flip.argtypes = [C.POINTER(Lattice), C.c_int, C.c_int]
-        self.__calc_pi.argtypes = [C.POINTER(Lattice), C.c_int, C.c_int]
-        self.__calc_energy.argtypes = [C.POINTER(Lattice), C.c_int]
-        self.__calc_magnet.argtypes = [C.POINTER(Lattice), C.c_int]
-        self.__calc_lattice.argtypes = [C.POINTER(Lattice)]
-
-        # Origen de datos
-        self._data = data
+        self.__init.argtypes = [C.POINTER(Ising), C.c_int]
+        self.__set_params.argtypes = [C.POINTER(Ising), C.c_float, C.c_float, C.c_float]
+        self.__info.argtypes = [C.POINTER(Ising)]
+        self.__metropolis.argtypes = [C.POINTER(Ising), C.c_int]
+        self.__run.argtypes = [C.POINTER(Ising), C.c_int]
+        self.__run_until.argtypes = [C.POINTER(Ising), C.c_int, C.c_float]
+        self.__run_sample.argtypes = [C.POINTER(Ising), C.POINTER(Sample)]
+        self.__pick_site.argtypes = [C.POINTER(Ising)]
+        self.__flip.argtypes = [C.POINTER(Ising), C.c_int]
+        self.__find_neighbors.argtypes = [C.POINTER(Ising), C.c_int]
+        self.__cost.argtypes = [C.POINTER(Ising), C.c_int]
+        self.__try_flip.argtypes = [C.POINTER(Ising), C.c_float]
+        self.__accept_flip.argtypes = [C.POINTER(Ising), C.c_int, C.c_int]
+        self.__calc_pi.argtypes = [C.POINTER(Ising), C.c_int, C.c_int]
+        self.__calc_energy.argtypes = [C.POINTER(Ising), C.c_int]
+        self.__calc_magnet.argtypes = [C.POINTER(Ising), C.c_int]
+        self.__calc_lattice.argtypes = [C.POINTER(Ising)]
+        self.__autocorrelation.argtypes = [C.POINTER(C.c_float), C.POINTER(C.c_float), C.c_int]
 
         # Otras variables internas
         self._step_size = None
         self._max_ntry = 1e6
-
-        # Curvas para liveplot
-        self.lattice = Curve('Lattice')
-        self.lattice.preset(vmin=-1, vmax=1, cmap='gray')
-        self.energy = Curve('Energy')
-        self.magnet = Curve('Magnetization')
 
         # Memoria asignada a la red
         self._lattice = np.ones(n**2, dtype=C.c_int)
@@ -202,14 +151,19 @@ class Lattice(C.Structure):
             self._magnet = np.zeros(self._step_size, dtype=C.c_int)
             self._p_magnet = self._magnet.ctypes.data_as(C.POINTER(C.c_int))
 
+    @property
+    def energy(self):
+        return np.trim_zeros(self._energy)
+
+    @property
+    def magnet(self):
+        return np.trim_zeros(self._magnet)
+
     def _update(self):
-        self.lattice.data = np.copy(self._lattice).reshape([self._n, self._n])
-        self.energy.data = self._energy[0:self._flips]
-        self.magnet.data = self._magnet[0:self._flips]
+        pass
 
     def fill_random(self, prob=0.5):
         self._lattice[np.random.rand(self._n**2) > prob] *= -1
-        self.lattice.data = np.copy(self._lattice).reshape([self._n, self._n])
         self.calc_lattice()
 
     def pick_site(self):
@@ -253,6 +207,87 @@ class Lattice(C.Structure):
     def run_sample(self, sample_size, step_size=None, tolerance=10.0):
         if step_size is not None:
             self.step_size = step_size
-        data = Result(sample_size, self.step_size, tolerance)
+        data = Sample(sample_size, self.step_size, tolerance)
         self.__run_sample(self, data)
         return data
+
+    def autocorrelation(self, data):
+        self._p_energy = self._energy.ctypes.data_as(C.POINTER(C.c_float))
+        data = np.array(data.astype(float), dtype=C.c_float)
+        result = np.zeros(data.size, dtype=C.c_float)
+        self.__autocorrelation(data.ctypes.data_as(C.POINTER(C.c_float)),
+                               result.ctypes.data_as(C.POINTER(C.c_float)),
+                               len(data))
+        return np.array(result, dtype=float)
+
+    @classmethod
+    def plot_step(cls, data, ax=None, **kwargs):
+        params = {'label': 'Last step',
+                  'lw': 2,
+                  'ls': '-'}
+        params.update(kwargs)
+        data = np.trim_zeros(data)
+        if ax is None:
+            plt.ion()
+            fig, ax = plt.subplots(1)
+
+        curve, = ax.plot(data, **params)
+        return curve
+
+    @classmethod
+    def plot_lattice(cls, data1D, ax=None, **kwargs):
+        params = {'vmin': -1,
+                  'vmax': 1,
+                  'cmap': 'gray'}
+        params.update(kwargs)
+
+        n = int(len(data1D)**0.5)
+        data = np.reshape(data1D,(n,n))
+
+        if ax is None:
+            plt.ion()
+            fig, ax = plt.subplots(1)
+
+        curve = ax.matshow(data, **params)
+        return curve
+
+    @classmethod
+    def plot_correlation(cls, data):
+        n = len(data)
+        plt.ion()
+        fig, ax = plt.subplots(2)
+
+        x = data[0:int(n/100)]
+        acorr = cls.autocorrelation(x)
+        curve_d = cls.plot_step(x, ax=ax[0], label='Data')
+        curve_a = cls.plot_step(acorr, ax=ax[1], label='Autocorrelation')
+
+        for i in range(99):
+            x = data[0:int(n*(i+2)/100)]
+            acorr = cls.autocorrelation(x)
+            curve_d.set_data(np.arange(x.size), x)
+            curve_a.set_data(np.arange(acorr.size), acorr)
+            ax[0].relim()
+            ax[1].relim()
+            ax[0].autoscale()
+            ax[1].autoscale()
+            plt.draw()
+            plt.pause(0.00001)
+
+    @classmethod
+    def autocorrelation (cls, x):
+        xp = x-np.mean(x)
+        f = np.fft.fft(xp)
+        p = np.array([np.real(v)**2+np.imag(v)**2 for v in f])
+        pi = np.fft.ifft(p)
+        return np.real(pi)[:int(x.size/2)]/np.sum(xp**2)
+
+    @classmethod
+    def autocorrelation2(cls, x):
+        n = len(x)
+        var = np.var(x)
+        acorr = np.zeros(n, dtype=float)
+        for k in range(n):
+            acorr[k] = np.sum((x[0:n-k]-np.mean(x[0:n-k]))
+                              *(x[k:n]-np.mean(x[k:n]))) / (n*var)
+        return acorr

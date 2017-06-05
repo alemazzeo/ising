@@ -8,7 +8,7 @@
 
 int main(int argc, char **argv)
 {
-    Lattice *ising;
+    Ising *ising;
     int n = 32;
 
     float prob=0.5;
@@ -30,7 +30,7 @@ int main(int argc, char **argv)
 
     srand(time(NULL));
 
-    ising = malloc(sizeof(Lattice));
+    ising = malloc(sizeof(Ising));
     ising -> _p_lattice = malloc(n*n*sizeof(int));
 	ising -> _p_energy = malloc(pasos * sizeof(int));
 	ising -> _p_magnet = malloc(pasos * sizeof(int));
