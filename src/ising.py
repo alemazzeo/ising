@@ -6,6 +6,97 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
+class Utilities():
+    @classmethod
+    def plot_array1D(cls, data, ax=None, **kwargs):
+        params = {'label': 'Last step',
+                  'lw': 2,
+                  'ls': '-'}
+        params.update(kwargs)
+        data = np.trim_zeros(data)
+        if ax is None:
+            plt.ion()
+            fig, ax = plt.subplots(1)
+
+        curve, = ax.plot(data, **params)
+        return curve
+
+    @classmethod
+    def plot_hist(cls, data, ax=None, **kwargs):
+        params = {}
+        params.update(kwargs)
+        data = np.trim_zeros(data)
+        if ax is None:
+            plt.ion()
+            fig, ax = plt.subplots(1)
+
+        Y, X, _ = ax.plot(data, **params)
+        return [Y, X], ax, fig
+
+    @classmethod
+    def plot_lattice(cls, data1D, ax=None, **kwargs):
+        params = {'vmin': -1,
+                  'vmax': 1,
+                  'cmap': 'gray'}
+        params.update(kwargs)
+
+        n = int(len(data1D)**0.5)
+        data = np.reshape(data1D,(n,n))
+
+        if ax is None:
+            plt.ion()
+            fig, ax = plt.subplots(1)
+
+        curve = ax.matshow(data, **params)
+        return curve, ax, fig
+
+    @classmethod
+    def plot_correlation(cls, data, ax=None,
+                         plot1_kw=dict(label='Data'),
+                         plot2_kw=dict(label='Autocorrelation')):
+        n = len(data)
+        assert ax==None or len(ax) == 2
+        if ax is None:
+            plt.ion()
+            fig, ax = plt.subplots(2)
+
+        x = data[0:int(n/100)]
+        acorr = cls.autocorrelation(x)
+        curve_d = cls.plot_step(x, ax=ax[0], **plot1_kw)
+        curve_a = cls.plot_step(acorr, ax=ax[1], **plot2_kw)
+
+        for i in range(99):
+            x = data[0:int(n*(i+2)/100)]
+            acorr = cls.autocorrelation(x)
+            curve_d.set_data(np.arange(x.size), x)
+            curve_a.set_data(np.arange(acorr.size), acorr)
+            ax[0].relim()
+            ax[1].relim()
+            ax[0].autoscale()
+            ax[1].autoscale()
+            plt.draw()
+            plt.pause(0.00001)
+
+        return curve_d, curve_a, ax, fig
+
+    @classmethod
+    def autocorrelation (cls, x):
+        xp = x-np.mean(x)
+        f = np.fft.fft(xp)
+        p = np.array([np.real(v)**2+np.imag(v)**2 for v in f])
+        pi = np.fft.ifft(p)
+        return np.real(pi)[:int(x.size/2)]/np.sum(xp**2)
+
+    @classmethod
+    def autocorrelation2(cls, x):
+        n = len(x)
+        var = np.var(x)
+        acorr = np.zeros(n, dtype=float)
+        for k in range(n):
+            acorr[k] = np.sum((x[0:n-k]-np.mean(x[0:n-k]))
+                              *(x[k:n]-np.mean(x[k:n]))) / (n*var)
+        return acorr
+
 class Sample(C.Structure):
     _fields_ = [("_sample_size", C.c_int),
                 ("_step_size", C.c_int),
@@ -144,83 +235,73 @@ class Ising(C.Structure):
                 ("_p_energy", C.POINTER(C.c_float)),
                 ("_p_magnet", C.POINTER(C.c_int))]
 
-    def __init__(self, n, name='ising', path='../data/states/'):
-
-        # Nombre y ruta
-        self._name = name
-        self._path = path
+    def __init__(self, n):
 
         # Biblioteca de funciones
         self._lib = C.CDLL('./libising.so')
 
-        self.__init = self._lib.init
-        self.__set_params = self._lib.set_params
-        self.__info = self._lib.info
-        self.__metropolis = self._lib.metropolis
-        self.__run = self._lib.run
-        self.__run_until = self._lib.run_until
-        self.__run_sample = self._lib.run_sample
-        self.__pick_site = self._lib.pick_site
-        self.__flip = self._lib.flip
-        self.__find_neighbors = self._lib.find_neighbors
-        self.__cost = self._lib.cost
-        self.__try_flip = self._lib.try_flip
-        self.__accept_flip = self._lib.accept_flip
-        self.__calc_pi = self._lib.calc_pi
-        self.__calc_energy = self._lib.calc_energy
-        self.__calc_magnet = self._lib.calc_magnet
-        self.__calc_lattice = self._lib.calc_lattice
-        self.__autocorrelation = self._lib.autocorrelation
+        self.init = self._lib.init
+        self.set_params = self._lib.set_params
+        self.info = self._lib.info
+        self.metropolis = self._lib.metropolis
+        self.run = self._lib.run
+        self.run_until = self._lib.run_until
+        self.run_sample = self._lib.run_sample
+        self.pick_site = self._lib.pick_site
+        self.flip = self._lib.flip
+        self.find_neighbors = self._lib.find_neighbors
+        self.cost = self._lib.cost
+        self.try_flip = self._lib.try_flip
+        self.accept_flip = self._lib.accept_flip
+        self.calc_pi = self._lib.calc_pi
+        self.calc_energy = self._lib.calc_energy
+        self.calc_magnet = self._lib.calc_magnet
+        self.calc_lattice = self._lib.calc_lattice
 
-        self.__init.restype = C.c_int
-        self.__set_params.restype = C.c_int
-        self.__info.restype = C.c_int
-        self.__metropolis.restype = C.c_int
-        self.__run.restype = C.c_int
-        self.__run_until.restype = C.c_float
-        self.__run_sample.restype = C.c_int
-        self.__pick_site.restype = C.c_int
-        self.__flip.restype = C.c_int
-        self.__find_neighbors.restype = C.c_int
-        self.__cost.restype = C.c_int
-        self.__try_flip.restype = C.c_int
-        self.__accept_flip.restype = C.c_int
-        self.__calc_pi.restype = C.c_float
-        self.__calc_energy.restype = C.c_float
-        self.__calc_magnet.restype = C.c_int
-        self.__calc_lattice.restype = C.c_int
-        self.__autocorrelation.restype = C.c_int
+        self.init.restype = C.c_int
+        self.set_params.restype = C.c_int
+        self.info.restype = C.c_int
+        self.metropolis.restype = C.c_int
+        self.run.restype = C.c_int
+        self.run_until.restype = C.c_float
+        self.run_sample.restype = C.c_int
+        self.pick_site.restype = C.c_int
+        self.flip.restype = C.c_int
+        self.find_neighbors.restype = C.c_int
+        self.cost.restype = C.c_int
+        self.try_flip.restype = C.c_int
+        self.accept_flip.restype = C.c_int
+        self.calc_pi.restype = C.c_float
+        self.calc_energy.restype = C.c_float
+        self.calc_magnet.restype = C.c_int
+        self.calc_lattice.restype = C.c_int
 
-        self.__init.argtypes = [C.POINTER(Ising), C.c_int]
-        self.__set_params.argtypes = [C.POINTER(Ising), C.c_float, C.c_float, C.c_float]
-        self.__info.argtypes = [C.POINTER(Ising)]
-        self.__metropolis.argtypes = [C.POINTER(Ising), C.c_int]
-        self.__run.argtypes = [C.POINTER(Ising), C.c_int]
-        self.__run_until.argtypes = [C.POINTER(Ising), C.c_int, C.c_float]
-        self.__run_sample.argtypes = [C.POINTER(Ising), C.POINTER(Sample)]
-        self.__pick_site.argtypes = [C.POINTER(Ising)]
-        self.__flip.argtypes = [C.POINTER(Ising), C.c_int]
-        self.__find_neighbors.argtypes = [C.POINTER(Ising), C.c_int]
-        self.__cost.argtypes = [C.POINTER(Ising), C.c_int]
-        self.__try_flip.argtypes = [C.POINTER(Ising), C.c_float]
-        self.__accept_flip.argtypes = [C.POINTER(Ising), C.c_int, C.c_int]
-        self.__calc_pi.argtypes = [C.POINTER(Ising), C.c_int, C.c_int]
-        self.__calc_energy.argtypes = [C.POINTER(Ising), C.c_int]
-        self.__calc_magnet.argtypes = [C.POINTER(Ising), C.c_int]
-        self.__calc_lattice.argtypes = [C.POINTER(Ising)]
-        self.__autocorrelation.argtypes = [C.POINTER(C.c_float), C.POINTER(C.c_float), C.c_int]
+        self.init.argtypes = [C.POINTER(Ising), C.c_int]
+        self.set_params.argtypes = [C.POINTER(Ising), C.c_float, C.c_float, C.c_float]
+        self.info.argtypes = [C.POINTER(Ising)]
+        self.metropolis.argtypes = [C.POINTER(Ising), C.c_int]
+        self.run.argtypes = [C.POINTER(Ising), C.c_int]
+        self.run_until.argtypes = [C.POINTER(Ising), C.c_int, C.c_float]
+        self.run_sample.argtypes = [C.POINTER(Ising), C.POINTER(Sample)]
+        self.pick_site.argtypes = [C.POINTER(Ising)]
+        self.flip.argtypes = [C.POINTER(Ising), C.c_int]
+        self.find_neighbors.argtypes = [C.POINTER(Ising), C.c_int]
+        self.cost.argtypes = [C.POINTER(Ising), C.c_int]
+        self.try_flip.argtypes = [C.POINTER(Ising), C.c_float]
+        self.accept_flip.argtypes = [C.POINTER(Ising), C.c_int, C.c_int]
+        self.calc_pi.argtypes = [C.POINTER(Ising), C.c_int, C.c_int]
+        self.calc_energy.argtypes = [C.POINTER(Ising), C.c_int]
+        self.calc_magnet.argtypes = [C.POINTER(Ising), C.c_int]
+        self.calc_lattice.argtypes = [C.POINTER(Ising)]
 
         # Otras variables internas
         self._step_size = None
-
-        # Memoria asignada a la red
-        self._lattice = np.ones(n**2, dtype=C.c_int)
-        self._p_lattice = self._lattice.ctypes.data_as(C.POINTER(C.c_int))
         self.step_size = int(1.5 * n**2)
 
         # Inicializa los valores
-        self.__init(self, n)
-        self.calc_lattice()
+        self.init(self, n)
+        self.assign_lattice(np.ones(n**2))
+        self.calc_lattice(self)
 
     def _set(self, T=None, J=None, B=None):
         if T is None:
@@ -231,21 +312,44 @@ class Ising(C.Structure):
             B = self._B
         self.__set_params(self, T, J, B)
 
+    def assign_lattice(self, data):
+        n = len(data)
+        assert n == self._n**2
+        self._lattice = np.array(data, dtype=C.c_int)
+        self._p_lattice = self._lattice.ctypes.data_as(C.POINTER(C.c_int))
+
+    def fill_random(self, prob=0.5):
+        random = np.ones(self._n**2)
+        random[np.random.rand(self._n**2) > prob] *= -1
+        self.assign_lattice(random)
+        self.calc_lattice(self)
+
+
+class State(Ising):
+    def __init__(self, n, name='ising', path='../data/states/'):
+
+        super().__init__(n)
+
+        # Nombre y ruta
+        self._name = name
+        self._path = path
+
+        # Otras variables internas
+        self._step_size = None
+        self.step_size = int(1.5 * n**2)
+
     @property
     def T(self): return self._T
-
     @T.setter
     def T(self, value): self._set(T=value)
 
     @property
     def J(self): return self._J
-
     @J.setter
     def J(self, value): self._set(J=value)
 
     @property
     def B(self): return self._B
-
     @B.setter
     def B(self, value): self._set(B=value)
 
@@ -279,9 +383,6 @@ class Ising(C.Structure):
     @property
     def magnet(self):
         return np.trim_zeros(self._magnet)
-
-    def _update(self):
-        pass
 
     def save(self, name=None, path=None):
         extension = '.state'
@@ -326,58 +427,30 @@ class Ising(C.Structure):
 
         params, data = np.load(path+name)
 
-        load_ising = cls(n = int(params[0]))
-        load_ising._total_flips = int(params[1])
+        load_state = cls(n = int(params[0]))
+        load_state._total_flips = int(params[1])
 
-        load_ising.T = float(params[2])
-        load_ising.J = float(params[3])
-        load_ising.B = float(params[4])
+        load_state.T = float(params[2])
+        load_state.J = float(params[3])
+        load_state.B = float(params[4])
 
-        load_ising._lattice = data
-        load_ising._p_lattice = load_ising._lattice.ctypes.data_as(C.POINTER(C.c_int))
-        load_ising.calc_lattice()
+        load_state._lattice = data
+        load_state._p_lattice = load_ising._lattice.ctypes.data_as(C.POINTER(C.c_int))
+        load_state.calc_lattice()
 
-        return load_ising
-
-    def fill_random(self, prob=0.5):
-        self._lattice[np.random.rand(self._n**2) > prob] *= -1
-        self.calc_lattice()
-
-    def pick_site(self):
-        return self.__pick_site(self)
-
-    def find_neighbors(self, idx):
-        self.__find_neighbors(self, idx)
-        return self._W, self._N, self._E, self._S
-
-    def cost(self, idx):
-        self.find_neighbors(idx)
-        return self.__cost(self, idx)
-
-    def accept_flip(self, idx):
-        aligned = self.cost(idx)
-        self.__accept_flip(self, idx, aligned)
-
-    def calc_energy(self, idx):
-        return self.__calc_energy(self, idx)
-
-    def calc_magnet(self, idx):
-        return self.__calc_magnet(self, idx)
-
-    def calc_lattice(self):
-        self.__calc_lattice(self)
+        return load_state
 
     def run(self, step_size=None):
         if step_size is not None:
             self.step_size = step_size
-        nflips = self.__run(self, self.step_size)
+        nflips = super().run(self, self.step_size)
         self._update()
         return nflips
 
     def run_until(self, step_size=None, tolerance=10.0):
         if step_size is not None:
             self.step_size = step_size
-        q = self.__run_until(self, self.step_size, tolerance)
+        q = super().run_until(self, self.step_size, tolerance)
         self._update()
         return q
 
@@ -385,79 +458,107 @@ class Ising(C.Structure):
         if step_size is not None:
             self.step_size = step_size
         data = Sample(sample_size, self.step_size, tolerance)
-        self.__run_sample(self, data)
+        super().run_sample(self, data)
         return data
 
+class Simulation(State):
+    def __init__(self, n, name='sim', path='../data/simulations'):
+
+        State.__init__(self, n)
+        self.fill_random()
+
+        self.J = J
+        self.B = B
+
+        self._name = name
+        self._path = path
+
+        self._params = list()
+        self._sample_names = list()
+        self._state_names = list()
+
+    def sweep(self, parameter, end, sweep_step=None,
+                    sample_size=10000, ising_step='auto', therm='auto'):
+
+        if therm == 'auto':
+            therm = self._n2 * 50
+
+        if ising_step == 'auto':
+            ising_step = self._n2 * 2
+
+        if parameter in ('T', 'Temperature'):
+            start = self.T
+            set_value = lambda value: self._set(T=value)
+        elif parameter in ('J', 'Interaction'):
+            start = self.J
+            set_value = lambda value: self._set(J=value)
+        elif parameter in ('B', 'Extern field'):
+            start = self.B
+            set_value = lambda value: self._set(B=value)
+        else:
+            print('Available parameters to sweep:')
+            print('"Temperature"  or "T"')
+            print('"Interaction"  or "J"')
+            print('"Extern field" or "B"')
+            return 0
+
+        values = np.arange(start, end, sweep_step)
+        n = float(len(values))
+
+        for i, value in np.ndenumerate(values):
+            text_bar = '*' * int(i/n) + '-' * int(1-i/n)
+            print(parameter + '%.4f'%(value) + text_bar + '  ', end='\r')
+
+            # Set T and run until thermalization
+            set_value(value)
+            self.run_until(therm)
+
+            # Fill a sample
+            sample = self.run_sample(sample_size, ising_step)
+            # Store sample in a list
+            self._samples.append(sample)
+            self._params = [self.T, self.J, self.B]
+        print('Sweep completed.')
+
+    def save(self, name=None, path=None):
+
+        extension = '.simulation'
+
+        if path is None:
+            path = self._path
+
+        os.makedirs(path, exist_ok=True)
+
+        if name is None:
+            name = self._name
+
+        if os.path.isfile(path+name+'0'+extension):
+            i = 0
+            newname = name + str(i)
+            while os.path.isfile(path+newname+extension):
+                i += 1
+                newname = name + str(i)
+            name = newname
+        else:
+            name = name + '0'
+
+        fullname = path + name + extension
+
+        data = [self._params,
+                self._sample_names,
+                self._state_names]
+
+        np.save(fullname, data)
+
+        return "'" + fullname + "'" + ' has been successfully saved'
+
     @classmethod
-    def plot_step(cls, data, ax=None, **kwargs):
-        params = {'label': 'Last step',
-                  'lw': 2,
-                  'ls': '-'}
-        params.update(kwargs)
-        data = np.trim_zeros(data)
-        if ax is None:
-            plt.ion()
-            fig, ax = plt.subplots(1)
+    def load(cls, name, path='../data/simulations/'):
+        extension = '.simulation'
+        if name[-len(extension):] != extension:
+            name = name + extension
 
-        curve, = ax.plot(data, **params)
-        return curve
+        params, sample_names, state_names  = np.load(path+name)
 
-    @classmethod
-    def plot_lattice(cls, data1D, ax=None, **kwargs):
-        params = {'vmin': -1,
-                  'vmax': 1,
-                  'cmap': 'gray'}
-        params.update(kwargs)
 
-        n = int(len(data1D)**0.5)
-        data = np.reshape(data1D,(n,n))
-
-        if ax is None:
-            plt.ion()
-            fig, ax = plt.subplots(1)
-
-        curve = ax.matshow(data, **params)
-        return curve
-
-    @classmethod
-    def plot_correlation(cls, data, ax=None):
-        n = len(data)
-        assert ax=None or len(ax) == 2
-        if ax is None:
-            plt.ion()
-            fig, ax = plt.subplots(2)
-
-        x = data[0:int(n/100)]
-        acorr = cls.autocorrelation(x)
-        curve_d = cls.plot_step(x, ax=ax[0], label='Data')
-        curve_a = cls.plot_step(acorr, ax=ax[1], label='Autocorrelation')
-
-        for i in range(99):
-            x = data[0:int(n*(i+2)/100)]
-            acorr = cls.autocorrelation(x)
-            curve_d.set_data(np.arange(x.size), x)
-            curve_a.set_data(np.arange(acorr.size), acorr)
-            ax[0].relim()
-            ax[1].relim()
-            ax[0].autoscale()
-            ax[1].autoscale()
-            plt.draw()
-            plt.pause(0.00001)
-
-    @classmethod
-    def autocorrelation (cls, x):
-        xp = x-np.mean(x)
-        f = np.fft.fft(xp)
-        p = np.array([np.real(v)**2+np.imag(v)**2 for v in f])
-        pi = np.fft.ifft(p)
-        return np.real(pi)[:int(x.size/2)]/np.sum(xp**2)
-
-    @classmethod
-    def autocorrelation2(cls, x):
-        n = len(x)
-        var = np.var(x)
-        acorr = np.zeros(n, dtype=float)
-        for k in range(n):
-            acorr[k] = np.sum((x[0:n-k]-np.mean(x[0:n-k]))
-                              *(x[k:n]-np.mean(x[k:n]))) / (n*var)
-        return acorr
+        return load_sample
