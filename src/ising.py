@@ -4,6 +4,124 @@ matplotlib.use('Qt5Agg')
 import ctypes as C
 import numpy as np
 import matplotlib.pyplot as plt
+import os
+
+class Sample(C.Structure):
+    _fields_ = [("_sample_size", C.c_int),
+                ("_step_size", C.c_int),
+                ("_tolerance", C.c_float),
+                ("_T", C.c_float),
+                ("_J", C.c_float),
+                ("_B", C.c_float),
+                ("_p_energy", C.POINTER(C.c_float)),
+                ("_p_magnet", C.POINTER(C.c_int)),
+                ("_p_flips", C.POINTER(C.c_int)),
+                ("_p_total_flips", C.POINTER(C.c_int)),
+                ("_p_q", C.POINTER(C.c_float))]
+
+    def __init__(self, sample_size, step_size=None, tolerance=None,
+                 path='../data/samples/', name=None):
+
+        self._sample_size = sample_size
+        self._step_size = step_size
+        self._tolerance = tolerance
+        self._path = path
+        self._name = name
+
+        # Memoria asignada
+        self._energy = np.zeros(self._sample_size, dtype=C.c_float)
+        self._magnet = np.zeros(self._sample_size, dtype=C.c_int)
+        self._flips = np.zeros(self._sample_size, dtype=C.c_int)
+        self._total_flips = np.zeros(self._sample_size, dtype=C.c_int)
+        self._q = np.zeros(self._sample_size, dtype=C.c_float)
+
+        # Punteros
+        self._p_energy = self._energy.ctypes.data_as(C.POINTER(C.c_float))
+        self._p_magnet = self._magnet.ctypes.data_as(C.POINTER(C.c_int))
+        self._p_flips = self._flips.ctypes.data_as(C.POINTER(C.c_int))
+        self._p_total_flips = self._total_flips.ctypes.data_as(C.POINTER(C.c_int))
+        self._p_q = self._q.ctypes.data_as(C.POINTER(C.c_float))
+
+    def save(self, name=None, path=None):
+        extension = '.sample'
+
+        if path is None:
+            path = self._path
+
+        os.makedirs(path, exist_ok=True)
+
+        if name is None:
+            name = self._name
+
+        if os.path.isfile(path+name+'0'+extension):
+            i = 0
+            newname = name + str(i)
+            while os.path.isfile(path+newname+extension):
+                i += 1
+                newname = name + str(i)
+            name = newname
+        else:
+            name = name + '0'
+
+        fullname = path + name + extension
+
+        params = [self._sample_size,
+                  self._step_size,
+                  self._tolerance,
+                  self._T,
+                  self._J,
+                  self._B]
+
+        data = [self._energy,
+                self._magnet,
+                self._flips,
+                self._total_flips,
+                self._q]
+
+        np.save(fullname, [params,data])
+
+        return "'" + fullname + "'" + ' has been successfully saved'
+
+    @classmethod
+    def load(cls, name, path='../data/samples'):
+        extension = '.sample'
+        if name[-len(extension):] != extension:
+            name = name + extension
+
+        params, data = np.load(path+name)
+
+        load_sample = cls(sample_size = int(params[0]),
+                         step_size = int(params[1]),
+                         tolerance = float(params[2]),
+                         name = name,
+                         path = path)
+
+        load_sample._T = float(params[3])
+        load_sample._J = float(params[4])
+        load_sample._B = float(params[5])
+
+        load_sample._energy = data[0]
+        load_sample._magnet = data[1]
+        load_sample._flips = data[2]
+        load_sample._total_flips = data[3]
+        load_sample._q = data[4]
+
+        return load_sample
+
+    @property
+    def energy(self): return self._energy
+
+    @property
+    def magnet(self): return self._magnet
+
+    @property
+    def flips(self): return self._flips
+
+    @property
+    def total_flips(self): return self._total_flips
+
+    @property
+    def q(self): return self._q
 
 class Ising(C.Structure):
     _fields_ = [("_p_lattice", C.POINTER(C.c_int)),
@@ -26,7 +144,11 @@ class Ising(C.Structure):
                 ("_p_energy", C.POINTER(C.c_float)),
                 ("_p_magnet", C.POINTER(C.c_int))]
 
-    def __init__(self, n):
+    def __init__(self, n, name='ising', path='../data/states/'):
+
+        # Nombre y ruta
+        self._name = name
+        self._path = path
 
         # Biblioteca de funciones
         self._lib = C.CDLL('./libising.so')
@@ -90,7 +212,6 @@ class Ising(C.Structure):
 
         # Otras variables internas
         self._step_size = None
-        self._max_ntry = 1e6
 
         # Memoria asignada a la red
         self._lattice = np.ones(n**2, dtype=C.c_int)
@@ -162,6 +283,62 @@ class Ising(C.Structure):
     def _update(self):
         pass
 
+    def save(self, name=None, path=None):
+        extension = '.state'
+
+        if path is None:
+            path = self._path
+
+        os.makedirs(path, exist_ok=True)
+
+        if name is None:
+            name = self._name
+
+        if os.path.isfile(path+name+'0'+extension):
+            i = 0
+            newname = name + str(i)
+            while os.path.isfile(path+newname+extension):
+                i += 1
+                newname = name + str(i)
+            name = newname
+        else:
+            name = name + '0'
+
+        fullname = path + name + extension
+
+        params = [self._n,
+                  self._total_flips,
+                  self._T,
+                  self._J,
+                  self._B]
+
+        data = self._lattice
+
+        np.save(fullname, [params,data])
+
+        return "'" + fullname + "'" + ' has been successfully saved'
+
+    @classmethod
+    def load(cls, name, path='../data/states/'):
+        extension = '.state'
+        if name[-len(extension):] != extension:
+            name = name + extension
+
+        params, data = np.load(path+name)
+
+        load_ising = cls(n = int(params[0]))
+        load_ising._total_flips = int(params[1])
+
+        load_ising.T = float(params[2])
+        load_ising.J = float(params[3])
+        load_ising.B = float(params[4])
+
+        load_ising._lattice = data
+        load_ising._p_lattice = load_ising._lattice.ctypes.data_as(C.POINTER(C.c_int))
+        load_ising.calc_lattice()
+
+        return load_ising
+
     def fill_random(self, prob=0.5):
         self._lattice[np.random.rand(self._n**2) > prob] *= -1
         self.calc_lattice()
@@ -211,15 +388,6 @@ class Ising(C.Structure):
         self.__run_sample(self, data)
         return data
 
-    def autocorrelation(self, data):
-        self._p_energy = self._energy.ctypes.data_as(C.POINTER(C.c_float))
-        data = np.array(data.astype(float), dtype=C.c_float)
-        result = np.zeros(data.size, dtype=C.c_float)
-        self.__autocorrelation(data.ctypes.data_as(C.POINTER(C.c_float)),
-                               result.ctypes.data_as(C.POINTER(C.c_float)),
-                               len(data))
-        return np.array(result, dtype=float)
-
     @classmethod
     def plot_step(cls, data, ax=None, **kwargs):
         params = {'label': 'Last step',
@@ -252,10 +420,12 @@ class Ising(C.Structure):
         return curve
 
     @classmethod
-    def plot_correlation(cls, data):
+    def plot_correlation(cls, data, ax=None):
         n = len(data)
-        plt.ion()
-        fig, ax = plt.subplots(2)
+        assert ax=None or len(ax) == 2
+        if ax is None:
+            plt.ion()
+            fig, ax = plt.subplots(2)
 
         x = data[0:int(n/100)]
         acorr = cls.autocorrelation(x)
