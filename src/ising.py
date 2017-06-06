@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use('Qt5Agg')
+matplotlib.use('qt4Agg')
 
 import ctypes as C
 import numpy as np
@@ -7,6 +7,46 @@ import matplotlib.pyplot as plt
 import os
 
 class Utilities():
+    
+    @classmethod
+    def splitname(cls, fullname):
+        fullname, extension = os.path.splitext(fullname)
+        path, name = os.path.split(fullname)
+        return path, name, extension
+
+    @classmethod
+    def newname(cls, fullname, default='../data/temp.npy'):
+        path, name, extension = cls.splitname(fullname)
+        dpath, dname, dext = cls.splitname(default)
+
+        if extension == '':
+            extension = dext
+
+        if path == '':
+            path = dpath
+
+        os.makedirs(path, exist_ok=True)
+
+        if name == '':
+            name = dname
+
+        if os.path.isfile(path+'/'+name+'0'+extension):
+            i = 0
+            newname = name + str(i)
+            while os.path.isfile(path+'/'+newname+extension):
+                i += 1
+                newname = name + str(i)
+            name = newname
+        else:
+            name = name + '0'
+
+        return path + '/' + name + extension
+
+    @classmethod
+    def lastname(cls, fullname, default='../data/temp.npy'):
+        path, name, extension = cls.splitname(cls.newname(fullname, default))
+        return path + '/' + name[:-1] + str(int(name[-1])-1) + extension
+
     @classmethod
     def plot_array1D(cls, data, ax=None, **kwargs):
         params = {'label': 'Last step',
@@ -110,14 +150,12 @@ class Sample(C.Structure):
                 ("_p_total_flips", C.POINTER(C.c_int)),
                 ("_p_q", C.POINTER(C.c_float))]
 
-    def __init__(self, sample_size, step_size=None, tolerance=None,
-                 path='../data/samples/', name=None):
+    def __init__(self, sample_size, step_size=None, tolerance=None):
 
         self._sample_size = sample_size
         self._step_size = step_size
         self._tolerance = tolerance
-        self._path = path
-        self._name = name
+        self._fullname = None
 
         # Memoria asignada
         self._energy = np.zeros(self._sample_size, dtype=C.c_float)
@@ -133,28 +171,18 @@ class Sample(C.Structure):
         self._p_total_flips = self._total_flips.ctypes.data_as(C.POINTER(C.c_int))
         self._p_q = self._q.ctypes.data_as(C.POINTER(C.c_float))
 
-    def save(self, name=None, path=None):
-        extension = '.sample'
-
-        if path is None:
-            path = self._path
-
-        os.makedirs(path, exist_ok=True)
-
-        if name is None:
-            name = self._name
-
-        if os.path.isfile(path+name+'0'+extension):
-            i = 0
-            newname = name + str(i)
-            while os.path.isfile(path+newname+extension):
-                i += 1
-                newname = name + str(i)
-            name = newname
+    def save_as(self, fullname='', default='../data/samples/sample.npy'):
+        fullname = Utilities.newname(fullname, default)
+        self._fullname = fullname
+        if self.save():
+            return fullname
         else:
-            name = name + '0'
+            return ''
 
-        fullname = path + name + extension
+    def save(self):
+        if self._fullname is None:
+            print('First call save_as')
+            return False
 
         params = [self._sample_size,
                   self._step_size,
@@ -169,23 +197,28 @@ class Sample(C.Structure):
                 self._total_flips,
                 self._q]
 
-        np.save(fullname, [params,data])
-
-        return fullname
+        np.save(self._fullname, [params,data])
+        return self._fullname
 
     @classmethod
-    def load(cls, name, path='../data/samples'):
-        extension = '.sample'
-        if name[-len(extension):] != extension:
-            name = name + extension
+    def load(cls, fullname, default='../data/samples/sample.npy'):
+        path, name, extension = Utilities.splitname(fullname)
+        dpath, dname, dextension = Utilities.splitname(default)
 
-        params, data = np.load(path+name)
+        if path == '':
+            path = dpath
+        if name == '':
+            name = dname
+        if extension == '':
+            extension = dextension
+
+        fullname = path + '/' + name + extension
+
+        params, data = np.load(fullname)
 
         load_sample = cls(sample_size = int(params[0]),
                          step_size = int(params[1]),
-                         tolerance = float(params[2]),
-                         name = name,
-                         path = path)
+                         tolerance = float(params[2]))
 
         load_sample._T = float(params[3])
         load_sample._J = float(params[4])
@@ -196,6 +229,7 @@ class Sample(C.Structure):
         load_sample._flips = data[2]
         load_sample._total_flips = data[3]
         load_sample._q = data[4]
+        load_sample._fullname = fullname
 
         return load_sample
 
@@ -392,56 +426,50 @@ class Ising(C.Structure):
         return data
 
 class State(Ising):
-    def __init__(self, n, name='ising', path='../data/states/'):
+    def __init__(self, n):
 
         super().__init__(n)
+        self._fullname = None
 
-        # Nombre y ruta
-        self._name = name
-        self._path = path
-
-    def save(self, name=None, path=None):
-        extension = '.state'
-
-        if path is None:
-            path = self._path
-
-        os.makedirs(path, exist_ok=True)
-
-        if name is None:
-            name = self._name
-
-        if os.path.isfile(path+name+'0'+extension):
-            i = 0
-            newname = name + str(i)
-            while os.path.isfile(path+newname+extension):
-                i += 1
-                newname = name + str(i)
-            name = newname
+    def save_as(self, fullname='', default='../data/states/state.npy'):
+        fullname = Utilities.newname(fullname, default)
+        self._fullname = fullname
+        if self.save():
+            return fullname
         else:
-            name = name + '0'
+            return ''
 
-        fullname = path + name + extension
-
+    def save(self):
+        if self._fullname is None:
+            print('First call save_as')
+            return False
+        
         params = [self._n,
                   self._total_flips,
                   self._T,
                   self._J,
                   self._B]
-
+        
         data = self._lattice
-
-        np.save(fullname, [params,data])
-
-        return fullname
+            
+        np.save(self._fullname, [params,data])
+        return self._fullname
 
     @classmethod
-    def load(cls, name, path='../data/states/'):
-        extension = '.state'
-        if name[-len(extension):] != extension:
-            name = name + extension
+    def load(cls, fullname, default='../data/states/state.npy'):
+        path, name, extension = Utilities.splitname(fullname)
+        dpath, dname, dextension = Utilities.splitname(default)
 
-        params, data = np.load(path+name)
+        if path == '':
+            path = dpath
+        if name == '':
+            name = dname
+        if extension == '':
+            extension = dextension
+
+        fullname = path + '/' + name + extension
+
+        params, data = np.load(fullname)
 
         load_state = cls(n = int(params[0]))
         load_state._total_flips = int(params[1])
@@ -453,17 +481,17 @@ class State(Ising):
         load_state._lattice = data
         load_state._p_lattice = load_ising._lattice.ctypes.data_as(C.POINTER(C.c_int))
         load_state.calc_lattice()
+        load_state._fullname = fullname
 
         return load_state
 
 class Simulation(State):
-    def __init__(self, n, name='sim', path='../data/simulations'):
+    def __init__(self, n):
 
         super().__init__(n)
         self.fill_random()
 
-        self._name = name
-        self._path = path
+        self._fullname = None
 
         self._params = list()
         self._sample_names = list()
@@ -496,9 +524,12 @@ class Simulation(State):
 
         values = np.arange(start, end, sweep_step)
         n = float(len(values))
+        m = 50
+        temp_samples = '..data/simulations/temp/samples/sample.npy'
+        temp_states = '..data/simulations/temp/states/state.npy'
 
         for i, value in np.ndenumerate(values):
-            text_bar = '*' * int(i[0]/n) + '-' * int(1-i[0]/n)
+            text_bar = '*' * int(m*i[0]/n) + '-' * int(m*(1-i[0]/n))
             print(parameter + ' = %.4f'%(value) + text_bar + '  ', end='\r')
 
             # Set T and run until thermalization
@@ -508,8 +539,8 @@ class Simulation(State):
             # Fill a sample
             sample = self.run_sample(sample_size, ising_step)
 
-            sample_name = sample.save(name='temp', path='../datos/samples/')
-            state_name = super().save(name='temp', path='../datos/states/')
+            sample_name = sample.save_as(default=temp_samples)
+            state_name = super().save_as(default=temp_states)
 
             self._params = [self.T, self.J, self.B]
             self._sample_names.append(sample_name)
@@ -517,44 +548,34 @@ class Simulation(State):
 
         print('Sweep completed.')
 
-    def save(self, name=None, path=None):
-
-        extension = '.simulation'
-
-        if path is None:
-            path = self._path
-
-        os.makedirs(path, exist_ok=True)
-
-        if name is None:
-            name = self._name
-
-        if os.path.isfile(path+name+'0'+extension):
-            i = 0
-            newname = name + str(i)
-            while os.path.isfile(path+newname+extension):
-                i += 1
-                newname = name + str(i)
-            name = newname
+    def save_as(self, fullname, default='../data/simulations/sim.npy'):
+        fullname = Utilities.newname(fullname, default)
+        
+        self._fullname = fullname
+        if self.save():
+            return fullname
         else:
-            name = name + '0'
-
-        fullname = path + name + extension
+            return ''    
+       
+    def save(self):
+        if self._fullname is None:
+            print('First call save_as')
+            return False
 
         data = [self._params,
                 self._sample_names,
                 self._state_names]
 
-        np.save(fullname, data)
-
-        return "'" + fullname + "'" + ' has been successfully saved'
+        np.save(self._fullname, data)
+        return self._fullname
 
     @classmethod
-    def load(cls, name, path='../data/simulations/'):
-        extension = '.simulation'
-        if name[-len(extension):] != extension:
-            name = name + extension
+    def load(cls, fullname, default='../data/simulations/sim.npy'):
+        path, name, extension = Utilities.splitname(fullname)
+        dpath, dname, dextension = Utilities.splitname(default)
 
-        params, sample_names, state_names  = np.load(path+name)
+        fullname = path + '/' + name + extension
+
+        params, sample_names, state_names  = np.load(fullname)
 
         return params, sample_names, state_names
