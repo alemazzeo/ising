@@ -171,7 +171,7 @@ class Sample(C.Structure):
 
         np.save(fullname, [params,data])
 
-        return "'" + fullname + "'" + ' has been successfully saved'
+        return fullname
 
     @classmethod
     def load(cls, name, path='../data/samples'):
@@ -305,7 +305,6 @@ class Ising(C.Structure):
         self.C_init(self, n)
         self.C_calc_lattice(self)
 
-
     @property
     def T(self): return self._T
     @T.setter
@@ -434,7 +433,7 @@ class State(Ising):
 
         np.save(fullname, [params,data])
 
-        return "'" + fullname + "'" + ' has been successfully saved'
+        return fullname
 
     @classmethod
     def load(cls, name, path='../data/states/'):
@@ -460,11 +459,8 @@ class State(Ising):
 class Simulation(State):
     def __init__(self, n, name='sim', path='../data/simulations'):
 
-        State.__init__(self, n)
+        super().__init__(n)
         self.fill_random()
-
-        self.J = J
-        self.B = B
 
         self._name = name
         self._path = path
@@ -474,7 +470,7 @@ class Simulation(State):
         self._state_names = list()
 
     def sweep(self, parameter, end, sweep_step=None,
-                    sample_size=10000, ising_step='auto', therm='auto'):
+                    sample_size=100, ising_step='auto', therm='auto'):
 
         if therm == 'auto':
             therm = self._n2 * 50
@@ -502,8 +498,8 @@ class Simulation(State):
         n = float(len(values))
 
         for i, value in np.ndenumerate(values):
-            text_bar = '*' * int(i/n) + '-' * int(1-i/n)
-            print(parameter + '%.4f'%(value) + text_bar + '  ', end='\r')
+            text_bar = '*' * int(i[0]/n) + '-' * int(1-i[0]/n)
+            print(parameter + ' = %.4f'%(value) + text_bar + '  ', end='\r')
 
             # Set T and run until thermalization
             set_value(value)
@@ -511,9 +507,14 @@ class Simulation(State):
 
             # Fill a sample
             sample = self.run_sample(sample_size, ising_step)
-            # Store sample in a list
-            self._samples.append(sample)
+
+            sample_name = sample.save(name='temp', path='../datos/samples/')
+            state_name = super().save(name='temp', path='../datos/states/')
+
             self._params = [self.T, self.J, self.B]
+            self._sample_names.append(sample_name)
+            self._state_names.append(state_name)
+
         print('Sweep completed.')
 
     def save(self, name=None, path=None):
@@ -556,5 +557,4 @@ class Simulation(State):
 
         params, sample_names, state_names  = np.load(path+name)
 
-
-        return load_sample
+        return params, sample_names, state_names
