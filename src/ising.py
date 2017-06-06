@@ -237,106 +237,74 @@ class Ising(C.Structure):
 
     def __init__(self, n):
 
+        self._n = n
+        self._step_size = None
+
         # Biblioteca de funciones
         self._lib = C.CDLL('./libising.so')
 
-        self.init = self._lib.init
-        self.set_params = self._lib.set_params
-        self.info = self._lib.info
-        self.metropolis = self._lib.metropolis
-        self.run = self._lib.run
-        self.run_until = self._lib.run_until
-        self.run_sample = self._lib.run_sample
-        self.pick_site = self._lib.pick_site
-        self.flip = self._lib.flip
-        self.find_neighbors = self._lib.find_neighbors
-        self.cost = self._lib.cost
-        self.try_flip = self._lib.try_flip
-        self.accept_flip = self._lib.accept_flip
-        self.calc_pi = self._lib.calc_pi
-        self.calc_energy = self._lib.calc_energy
-        self.calc_magnet = self._lib.calc_magnet
-        self.calc_lattice = self._lib.calc_lattice
+        self.C_init = self._lib.init
+        self.C_set_params = self._lib.set_params
+        self.C_info = self._lib.info
+        self.C_metropolis = self._lib.metropolis
+        self.C_run = self._lib.run
+        self.C_run_until = self._lib.run_until
+        self.C_run_sample = self._lib.run_sample
+        self.C_pick_site = self._lib.pick_site
+        self.C_flip = self._lib.flip
+        self.C_find_neighbors = self._lib.find_neighbors
+        self.C_cost = self._lib.cost
+        self.C_try_flip = self._lib.try_flip
+        self.C_accept_flip = self._lib.accept_flip
+        self.C_calc_pi = self._lib.calc_pi
+        self.C_calc_energy = self._lib.calc_energy
+        self.C_calc_magnet = self._lib.calc_magnet
+        self.C_calc_lattice = self._lib.calc_lattice
 
-        self.init.restype = C.c_int
-        self.set_params.restype = C.c_int
-        self.info.restype = C.c_int
-        self.metropolis.restype = C.c_int
-        self.run.restype = C.c_int
-        self.run_until.restype = C.c_float
-        self.run_sample.restype = C.c_int
-        self.pick_site.restype = C.c_int
-        self.flip.restype = C.c_int
-        self.find_neighbors.restype = C.c_int
-        self.cost.restype = C.c_int
-        self.try_flip.restype = C.c_int
-        self.accept_flip.restype = C.c_int
-        self.calc_pi.restype = C.c_float
-        self.calc_energy.restype = C.c_float
-        self.calc_magnet.restype = C.c_int
-        self.calc_lattice.restype = C.c_int
+        self.C_init.restype = C.c_int
+        self.C_set_params.restype = C.c_int
+        self.C_info.restype = C.c_int
+        self.C_metropolis.restype = C.c_int
+        self.C_run.restype = C.c_int
+        self.C_run_until.restype = C.c_float
+        self.C_run_sample.restype = C.c_int
+        self.C_pick_site.restype = C.c_int
+        self.C_flip.restype = C.c_int
+        self.C_find_neighbors.restype = C.c_int
+        self.C_cost.restype = C.c_int
+        self.C_try_flip.restype = C.c_int
+        self.C_accept_flip.restype = C.c_int
+        self.C_calc_pi.restype = C.c_float
+        self.C_calc_energy.restype = C.c_float
+        self.C_calc_magnet.restype = C.c_int
+        self.C_calc_lattice.restype = C.c_int
 
-        self.init.argtypes = [C.POINTER(Ising), C.c_int]
-        self.set_params.argtypes = [C.POINTER(Ising), C.c_float, C.c_float, C.c_float]
-        self.info.argtypes = [C.POINTER(Ising)]
-        self.metropolis.argtypes = [C.POINTER(Ising), C.c_int]
-        self.run.argtypes = [C.POINTER(Ising), C.c_int]
-        self.run_until.argtypes = [C.POINTER(Ising), C.c_int, C.c_float]
-        self.run_sample.argtypes = [C.POINTER(Ising), C.POINTER(Sample)]
-        self.pick_site.argtypes = [C.POINTER(Ising)]
-        self.flip.argtypes = [C.POINTER(Ising), C.c_int]
-        self.find_neighbors.argtypes = [C.POINTER(Ising), C.c_int]
-        self.cost.argtypes = [C.POINTER(Ising), C.c_int]
-        self.try_flip.argtypes = [C.POINTER(Ising), C.c_float]
-        self.accept_flip.argtypes = [C.POINTER(Ising), C.c_int, C.c_int]
-        self.calc_pi.argtypes = [C.POINTER(Ising), C.c_int, C.c_int]
-        self.calc_energy.argtypes = [C.POINTER(Ising), C.c_int]
-        self.calc_magnet.argtypes = [C.POINTER(Ising), C.c_int]
-        self.calc_lattice.argtypes = [C.POINTER(Ising)]
+        self.C_init.argtypes = [C.POINTER(Ising), C.c_int]
+        self.C_set_params.argtypes = [C.POINTER(Ising), C.c_float, C.c_float, C.c_float]
+        self.C_info.argtypes = [C.POINTER(Ising)]
+        self.C_metropolis.argtypes = [C.POINTER(Ising), C.c_int]
+        self.C_run.argtypes = [C.POINTER(Ising), C.c_int]
+        self.C_run_until.argtypes = [C.POINTER(Ising), C.c_int, C.c_float]
+        self.C_run_sample.argtypes = [C.POINTER(Ising), C.POINTER(Sample)]
+        self.C_pick_site.argtypes = [C.POINTER(Ising)]
+        self.C_flip.argtypes = [C.POINTER(Ising), C.c_int]
+        self.C_find_neighbors.argtypes = [C.POINTER(Ising), C.c_int]
+        self.C_cost.argtypes = [C.POINTER(Ising), C.c_int]
+        self.C_try_flip.argtypes = [C.POINTER(Ising), C.c_float]
+        self.C_accept_flip.argtypes = [C.POINTER(Ising), C.c_int, C.c_int]
+        self.C_calc_pi.argtypes = [C.POINTER(Ising), C.c_int, C.c_int]
+        self.C_calc_energy.argtypes = [C.POINTER(Ising), C.c_int]
+        self.C_calc_magnet.argtypes = [C.POINTER(Ising), C.c_int]
+        self.C_calc_lattice.argtypes = [C.POINTER(Ising)]
 
-        # Otras variables internas
-        self._step_size = None
+        # Asigna la memoria para energy, magnet y lattice
         self.step_size = int(1.5 * n**2)
+        self.fill_random()
 
         # Inicializa los valores
-        self.init(self, n)
-        self.assign_lattice(np.ones(n**2))
-        self.calc_lattice(self)
+        self.C_init(self, n)
+        self.C_calc_lattice(self)
 
-    def _set(self, T=None, J=None, B=None):
-        if T is None:
-            T = self._T
-        if J is None:
-            J = self._J
-        if B is None:
-            B = self._B
-        self.__set_params(self, T, J, B)
-
-    def assign_lattice(self, data):
-        n = len(data)
-        assert n == self._n**2
-        self._lattice = np.array(data, dtype=C.c_int)
-        self._p_lattice = self._lattice.ctypes.data_as(C.POINTER(C.c_int))
-
-    def fill_random(self, prob=0.5):
-        random = np.ones(self._n**2)
-        random[np.random.rand(self._n**2) > prob] *= -1
-        self.assign_lattice(random)
-        self.calc_lattice(self)
-
-
-class State(Ising):
-    def __init__(self, n, name='ising', path='../data/states/'):
-
-        super().__init__(n)
-
-        # Nombre y ruta
-        self._name = name
-        self._path = path
-
-        # Otras variables internas
-        self._step_size = None
-        self.step_size = int(1.5 * n**2)
 
     @property
     def T(self): return self._T
@@ -383,6 +351,55 @@ class State(Ising):
     @property
     def magnet(self):
         return np.trim_zeros(self._magnet)
+
+    def _set(self, T=None, J=None, B=None):
+        if T is None:
+            T = self._T
+        if J is None:
+            J = self._J
+        if B is None:
+            B = self._B
+        self.C_set_params(self, T, J, B)
+
+    def assign_lattice(self, data):
+        n = len(data)
+        assert n == self._n**2
+        self._lattice = np.array(data, dtype=C.c_int)
+        self._p_lattice = self._lattice.ctypes.data_as(C.POINTER(C.c_int))
+
+    def fill_random(self, prob=0.5):
+        random = np.ones(self._n**2)
+        random[np.random.rand(self._n**2) > prob] *= -1
+        self.assign_lattice(random)
+        self.C_calc_lattice(self)
+
+    def run(self, step_size=None):
+        if step_size is not None:
+            self.step_size = step_size
+        nflips = self.C_run(self, self.step_size)
+        return nflips
+
+    def run_until(self, step_size=None, tolerance=10.0):
+        if step_size is not None:
+            self.step_size = step_size
+        q = self.C_run_until(self, self.step_size, tolerance)
+        return q
+
+    def run_sample(self, sample_size, step_size=None, tolerance=10.0):
+        if step_size is not None:
+            self.step_size = step_size
+        data = Sample(sample_size, self.step_size, tolerance)
+        self.C_run_sample(self, data)
+        return data
+
+class State(Ising):
+    def __init__(self, n, name='ising', path='../data/states/'):
+
+        super().__init__(n)
+
+        # Nombre y ruta
+        self._name = name
+        self._path = path
 
     def save(self, name=None, path=None):
         extension = '.state'
@@ -439,27 +456,6 @@ class State(Ising):
         load_state.calc_lattice()
 
         return load_state
-
-    def run(self, step_size=None):
-        if step_size is not None:
-            self.step_size = step_size
-        nflips = super().run(self, self.step_size)
-        self._update()
-        return nflips
-
-    def run_until(self, step_size=None, tolerance=10.0):
-        if step_size is not None:
-            self.step_size = step_size
-        q = super().run_until(self, self.step_size, tolerance)
-        self._update()
-        return q
-
-    def run_sample(self, sample_size, step_size=None, tolerance=10.0):
-        if step_size is not None:
-            self.step_size = step_size
-        data = Sample(sample_size, self.step_size, tolerance)
-        super().run_sample(self, data)
-        return data
 
 class Simulation(State):
     def __init__(self, n, name='sim', path='../data/simulations'):
