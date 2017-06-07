@@ -1,13 +1,20 @@
 import matplotlib
-matplotlib.use('qt4Agg')
+try:
+    matplotlib.use('Qt5Agg')
+except ImportError:
+    try:
+        matplotlib.use('qt4Agg')
+    except ImportError:
+        raise
 
 import ctypes as C
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import shutil
 
 class Utilities():
-    
+
     @classmethod
     def splitname(cls, fullname):
         fullname, extension = os.path.splitext(fullname)
@@ -46,6 +53,32 @@ class Utilities():
     def lastname(cls, fullname, default='../data/temp.npy'):
         path, name, extension = cls.splitname(cls.newname(fullname, default))
         return path + '/' + name[:-1] + str(int(name[-1])-1) + extension
+
+    @classmethod
+    def move(cls, files, dest, copy=False, verbose=False):
+        changes = list()
+        newlist = list()
+        for fullname in files:
+            path, name, extension = cls.splitname(fullname)
+            dpath, dname, dextension = cls.splitname(dest)
+
+            if (path==dpath and name[:len(dname)]==dname):
+                newlist.append(fullname)
+            else:
+                newname = cls.newname(dest)
+                if copy:
+                    shutil.copyfile(fullname, newname)
+                    if verbose:
+                        print(fullname + ' copy to ' + newname)
+                else:
+                    os.rename(fullname, newname)
+                    if verbose:
+                        print(fullname + ' move to ' + newname)
+
+                newlist.append(newname)
+                changes.append([fullname, newname])
+
+        return newlist, changes
 
     @classmethod
     def plot_array1D(cls, data, ax=None, **kwargs):
@@ -248,6 +281,21 @@ class Sample(C.Structure):
     @property
     def q(self): return self._q
 
+    def view_energy(self, ax=None, **kwargs):
+        Utilities.plot_hist(self.energy, ax=ax, **kwargs)
+
+    def view_magnet(self, ax=None, **kwargs):
+        Utilities.plot_hist(self.magnet, ax=ax, **kwargs)
+
+    def view_flips(self, ax=None, **kwargs):
+        Utilities.plot_array1D(self.flips, ax=ax, **kwargs)
+
+    def view_total_flips(self, ax=None, **kwargs):
+        Utilities.plot_array1D(self.total_flips, ax=ax, **kwargs)
+
+    def view_q(self, ax=None, **kwargs):
+        Utilities.plot_array1D(self.q, ax=ax, **kwargs)
+
 class Ising(C.Structure):
     _fields_ = [("_p_lattice", C.POINTER(C.c_int)),
                 ("_n", C.c_int),
@@ -400,11 +448,14 @@ class Ising(C.Structure):
         self._lattice = np.array(data, dtype=C.c_int)
         self._p_lattice = self._lattice.ctypes.data_as(C.POINTER(C.c_int))
 
+    def calc_lattice(self):
+        self.C_calc_lattice(self)
+
     def fill_random(self, prob=0.5):
         random = np.ones(self._n**2)
         random[np.random.rand(self._n**2) > prob] *= -1
         self.assign_lattice(random)
-        self.C_calc_lattice(self)
+        self.calc_lattice()
 
     def run(self, step_size=None):
         if step_size is not None:
@@ -443,15 +494,15 @@ class State(Ising):
         if self._fullname is None:
             print('First call save_as')
             return False
-        
+
         params = [self._n,
                   self._total_flips,
                   self._T,
                   self._J,
                   self._B]
-        
+
         data = self._lattice
-            
+
         np.save(self._fullname, [params,data])
         return self._fullname
 
@@ -479,17 +530,21 @@ class State(Ising):
         load_state.B = float(params[4])
 
         load_state._lattice = data
-        load_state._p_lattice = load_ising._lattice.ctypes.data_as(C.POINTER(C.c_int))
+        load_state._p_lattice = load_state._lattice.ctypes.data_as(C.POINTER(C.c_int))
         load_state.calc_lattice()
         load_state._fullname = fullname
 
         return load_state
 
-class Simulation(State):
-    def __init__(self, n):
+class Simulation():
+    def __init__(self, state):
 
-        super().__init__(n)
-        self.fill_random()
+        if isinstance(state, State):
+            self._state = state
+        elif isinstance(state, int):
+            self._state = State(state)
+
+        self._state.fill_random()
 
         self._fullname = None
 
@@ -501,20 +556,20 @@ class Simulation(State):
                     sample_size=100, ising_step='auto', therm='auto'):
 
         if therm == 'auto':
-            therm = self._n2 * 50
+            therm = self._state._n2 * 50
 
         if ising_step == 'auto':
-            ising_step = self._n2 * 2
+            ising_step = self._state._n2 * 2
 
         if parameter in ('T', 'Temperature'):
-            start = self.T
-            set_value = lambda value: self._set(T=value)
+            start = self._state.T
+            set_value = lambda value: self._state._set(T=value)
         elif parameter in ('J', 'Interaction'):
-            start = self.J
-            set_value = lambda value: self._set(J=value)
+            start = self._state.J
+            set_value = lambda value: self._state._set(J=value)
         elif parameter in ('B', 'Extern field'):
-            start = self.B
-            set_value = lambda value: self._set(B=value)
+            start = self._state.B
+            set_value = lambda value: self._state._set(B=value)
         else:
             print('Available parameters to sweep:')
             print('"Temperature"  or "T"')
@@ -525,49 +580,91 @@ class Simulation(State):
         values = np.arange(start, end, sweep_step)
         n = float(len(values))
         m = 50
-        temp_samples = '..data/simulations/temp/samples/sample.npy'
-        temp_states = '..data/simulations/temp/states/state.npy'
+        temp_samples = '../data/simulations/temp/samples/sample.npy'
+        temp_states = '../data/simulations/temp/states/state.npy'
 
         for i, value in np.ndenumerate(values):
-            text_bar = '*' * int(m*i[0]/n) + '-' * int(m*(1-i[0]/n))
-            print(parameter + ' = %.4f'%(value) + text_bar + '  ', end='\r')
+            j = int(m*(i[0]+1)/n)
+            text_bar = '*' * j + '-' * (m-j)
+            print(parameter + ' = %.4f - '%(value) + text_bar + '  ', end='\r')
 
             # Set T and run until thermalization
             set_value(value)
-            self.run_until(therm)
+            self._state.run_until(therm)
 
             # Fill a sample
-            sample = self.run_sample(sample_size, ising_step)
+            sample = self._state.run_sample(sample_size, ising_step)
 
-            sample_name = sample.save_as(default=temp_samples)
-            state_name = super().save_as(default=temp_states)
+            sample_name = sample.save_as(temp_samples)
+            state_name = self._state.save_as(temp_states)
 
-            self._params = [self.T, self.J, self.B]
+            self._params.append([self._state.T,
+                                 self._state.J,
+                                 self._state.B])
+
             self._sample_names.append(sample_name)
             self._state_names.append(state_name)
 
-        print('Sweep completed.')
+        print('Sweep completed.' + ' ' * (m+len(parameter)))
 
-    def save_as(self, fullname, default='../data/simulations/sim.npy'):
+    def save_as(self, fullname, default='../data/simulations/sim.npy', verbose=False):
+        if len(self._state_names) == 0:
+            return 'Simulation is empty'
+
+        if self._fullname is not None and fullname != self._fullname:
+            if verbose: print('Saving a simulation copy with new name')
+            copy_data = True
+        else:
+            copy_data = False
+
         fullname = Utilities.newname(fullname, default)
-        
+
         self._fullname = fullname
-        if self.save():
+        if self.save(copy=copy_data, verbose=verbose):
             return fullname
         else:
-            return ''    
-       
-    def save(self):
+            return ''
+
+    def save(self, copy=False, verbose=False):
         if self._fullname is None:
             print('First call save_as')
             return False
+
+        self.save_data(copy=copy, verbose=verbose)
 
         data = [self._params,
                 self._sample_names,
                 self._state_names]
 
+        if verbose: print('Saving simulation header file...', end='')
         np.save(self._fullname, data)
+        if verbose: print('Done')
         return self._fullname
+
+    def save_data(self, copy=False, verbose=False):
+        path, name, extension = Utilities.splitname(self._fullname)
+        sample_names = path + '/' + name + '/samples/sample.npy'
+        state_names = path + '/' + name + '/states/state.npy'
+
+        if verbose: print('Moving new samples to folder...')
+        self._sample_names, ch1 = Utilities.move(files=self._sample_names,
+                                                 dest=sample_names,
+                                                 copy=copy,
+                                                 verbose=verbose)
+
+        if verbose: print('Moving new states to folder...')
+        self._state_names, ch2 = Utilities.move(files=self._state_names,
+                                                dest=state_names,
+                                                copy=copy,
+                                                verbose=verbose)
+
+        return ch1, ch2
+
+    def __len__(self): return len(self._sample_names)
+    def __getitem__(self, key):
+        return self._params[key], self._sample_names[key], self._state_names[key]
+    def __delitem__(self, key):
+        self._params.pop(key), self._sample_names.pop(key), self._state_names.pop(key)
 
     @classmethod
     def load(cls, fullname, default='../data/simulations/sim.npy'):
@@ -578,4 +675,13 @@ class Simulation(State):
 
         params, sample_names, state_names  = np.load(fullname)
 
-        return params, sample_names, state_names
+        state = State.load(state_names[-1])
+        simulation = cls(state)
+        simulation._params = params
+        simulation._sample_names = sample_names
+        simulation._state_names = state_names
+        simulation._fullname = fullname
+
+        return simulation
+
+#class Analysis
