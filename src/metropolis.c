@@ -22,7 +22,7 @@ int init(Ising *self, int n)
     return 0;
 }
 
-int set_params(Ising *self, float T, float J, float B)
+int set_params(Ising *self, double T, double J, double B)
 {
     self -> _T = T;
     self -> _J = J;
@@ -97,7 +97,7 @@ int run(Ising *self, int ntry)
     return self -> _flips;
 }
 
-float run_until(Ising *self, int steps, float tolerance)
+double run_until(Ising *self, int steps, double tolerance)
 {
 	int accept = 0, reject=0;
 	self -> _flips = 0;
@@ -114,13 +114,13 @@ float run_until(Ising *self, int steps, float tolerance)
 			reject++;
 		}
 	}
-	return (float)(accept - reject) / (accept + reject);
+	return (double)(accept - reject) / (accept + reject);
 }
 
 int run_sample(Ising *self, Sample *result)
 {
 	int i, size, step_size;
-	float q, tolerance;
+	double q, tolerance;
 
 	size = (result -> _sample_size);
 
@@ -146,13 +146,13 @@ int run_sample(Ising *self, Sample *result)
 int pick_site(Ising *self)
 {
     // Elige un spin al azar y devuelve su posición
-    return (int) (((float) rand() / RAND_MAX) * (self -> _n2));
+    return (int) (((double) rand() / RAND_MAX) * (self -> _n2));
 }
 
 int flip(Ising *self, int idx)
 {
     int aligned;
-    float pi;
+    double pi;
 
     // Busca los indices de los vecinos
     find_neighbors(self, idx);
@@ -215,7 +215,7 @@ int cost(Ising *self, int idx)
     return self -> _aligned;
 }
 
-int try_flip(Ising *self, float pi)
+int try_flip(Ising *self, double pi)
 {
     if (pi > 1)
     {
@@ -232,7 +232,7 @@ int try_flip(Ising *self, float pi)
 
 int accept_flip(Ising *self, int idx, int aligned)
 {
-    float newE, newM;
+    double newE, newM;
     // Realiza el flip
     self -> _p_lattice[idx] *= -1;
     // Calcula los cambios
@@ -258,7 +258,7 @@ int accept_flip(Ising *self, int idx, int aligned)
     return 0;
 }
 
-float calc_pi(Ising *self, int idx, int aligned)
+double calc_pi(Ising *self, int idx, int aligned)
 {
     if (self -> _p_lattice[idx] < 0)
 		// Si al cambiar el spin se alinea con B
@@ -268,7 +268,7 @@ float calc_pi(Ising *self, int idx, int aligned)
         return self -> _p_exps[aligned+5];
 }
 
-float calc_energy(Ising *self, int idx)
+double calc_energy(Ising *self, int idx)
 {
     int opposites = 0;
 
@@ -305,10 +305,10 @@ int calc_lattice(Ising *self)
     return 0;
 }
 
-int autocorrelation(float *x, float *result, int n)
+int autocorrelation(double *x, double *result, int n)
 {
-    float sum = 0.0;
-    float mean = 0.0, sd2 = 0.0;
+    double sum = 0.0;
+    double mean = 0.0, sd2 = 0.0;
 
 	for (int i=0; i<n; i++)
 	{

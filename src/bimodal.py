@@ -1,48 +1,70 @@
 import matplotlib
-matplotlib.use('Qt5Agg')
+try:
+    matplotlib.use('Qt5Agg')
+except ImportError:
+    try:
+        matplotlib.use('qt4Agg')
+    except ImportError:
+        print("'Qt5Agg' or 'qt4Agg' request for interactive plot")
+        raise
 
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 from scipy.stats import gaussian_kde
 from scipy.signal import find_peaks_cwt
+from scipy.misc import factorial
 
 class Bimodal():
+
     @classmethod
     def gauss(cls, x, mu, sigma, A):
         return A*np.exp(-(x-mu)**2/2/sigma**2)
 
     @classmethod
-    def bimodal(cls, x, mu1, sigma1, A1, mu2, sigma2, A2):
+    def bimodal_gauss(cls, x, mu1, sigma1, A1, mu2, sigma2, A2):
         return cls.gauss(x, mu1, sigma1, A1) + cls.gauss(x, mu2, sigma2, A2)
 
     @classmethod
-    def bimodal_symmetry(cls, x, mu, sigma1, A1, sigma2, A2):
-        return cls.bimodal(x,-mu, sigma1, A1, mu, sigma2, A2)
+    def poisson(cls, k, lamb):
+        return (lamb**k/factorial(k)) * np.exp(-lamb)
 
     @classmethod
-    def fit_bimodal(cls, data, expected=None, symmetry=False, plot=False):
+    def bimodal_poisson(cls, k, A, lamb):
+        return (A * cls.poisson(k, lamb) + (1-A) * cls.poisson(1-k,lamb))
+
+    @classmethod
+    def fit_gaussian(cls, data, expected=None, plot=False):
         y, x = np.histogram(data, bins='sqrt', density=True)
         x = (x[1:] + x[:-1]) / 2
 
-        if symmetry:
-            params, cov = curve_fit(cls.bimodal_symmetry, x, y, expected)
-            params = [params[0], params[1], params[2],
-                      params[0], params[3], params[4]]
-            sigma = np.sqrt(np.diag(cov))
-            sigma = [sigma[0], sigma[1], sigma[2],
-                     sigma[0], sigma[3], sigma[4]]
-        else:
-            params, cov = curve_fit(cls.bimodal, x, y, expected)
-            sigma = np.sqrt(np.diag(cov))
+        params, cov = curve_fit(cls.gauss, x, y, expected)
+        sigma = np.sqrt(np.diag(cov))
 
         if plot:
             plt.ion()
             fig, ax = plt.subplots(1)
             cls.hist(data, ax=ax)
-            cls.plot_gauss(x, *params[0:3], ax=ax, label='Gauss 1', color='blue')
-            cls.plot_gauss(x, *params[3:6], ax=ax, label='Gauss 2', color='black')
-            cls.plot_bimodal(x, *params, ax=ax, label='Bimodal', color='red')
+            cls.plot_gauss(x, *params[0:3], ax=ax, label='Gaussian', color='blue')
+            ax.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
+                       ncol=4, mode="expand", borderaxespad=0.)
+        return params, sigma
+
+    @classmethod
+    def fit_bimodal(cls, data, expected=None, plot=False):
+        y, x = np.histogram(data, bins='sqrt', density=True)
+        x = (x[1:] + x[:-1]) / 2
+
+        params, cov = curve_fit(cls.bimodal_gauss, x, y, expected)
+        sigma = np.sqrt(np.diag(cov))
+
+        if plot:
+            plt.ion()
+            fig, ax = plt.subplots(1)
+            cls.hist(data, ax=ax)
+            cls.plot_gauss(x, *params[0:3], ax=ax, label='Gaussian 1', color='blue')
+            cls.plot_gauss(x, *params[3:6], ax=ax, label='Gaussian 2', color='black')
+            cls.plot_bimodal_gauss(x, *params, ax=ax, label='Bimodal', color='red')
             ax.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
                        ncol=4, mode="expand", borderaxespad=0.)
         return params, sigma
@@ -65,7 +87,7 @@ class Bimodal():
         y_pdf = f(x)
 
         if widths is None:
-            widths = np.arange(1,10)
+            widths = np.arange(1,20)
         peakind = find_peaks_cwt(y_pdf, widths)
 
         if plot:
@@ -131,7 +153,7 @@ class Bimodal():
         return curve
 
     @classmethod
-    def plot_bimodal(cls, x, mu1, sigma1, A1, mu2, sigma2, A2, ax=None, **kwargs):
+    def plot_bimodal_gauss(cls, x, mu1, sigma1, A1, mu2, sigma2, A2, ax=None, **kwargs):
         _default = {'label': 'Gauss',
                     'lw': 3,
                     'ls': '-',
@@ -143,6 +165,6 @@ class Bimodal():
             fig, ax = plt.subplots(1)
 
         params = (mu1, sigma1, A1, mu2, sigma2, A2)
-        curve, = ax.plot(x, cls.bimodal(x, *params), **_default)
+        curve, = ax.plot(x, cls.bimodal_gauss(x, *params), **_default)
 
         return curve

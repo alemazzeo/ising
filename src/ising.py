@@ -103,7 +103,7 @@ class Utilities():
             plt.ion()
             fig, ax = plt.subplots(1)
 
-        Y, X, _ = ax.plot(data, **params)
+        Y, X, _ = ax.hist(data, **params)
         return [Y, X], ax, fig
 
     @classmethod
@@ -173,15 +173,15 @@ class Utilities():
 class Sample(C.Structure):
     _fields_ = [("_sample_size", C.c_int),
                 ("_step_size", C.c_int),
-                ("_tolerance", C.c_float),
-                ("_T", C.c_float),
-                ("_J", C.c_float),
-                ("_B", C.c_float),
-                ("_p_energy", C.POINTER(C.c_float)),
+                ("_tolerance", C.c_double),
+                ("_T", C.c_double),
+                ("_J", C.c_double),
+                ("_B", C.c_double),
+                ("_p_energy", C.POINTER(C.c_double)),
                 ("_p_magnet", C.POINTER(C.c_int)),
                 ("_p_flips", C.POINTER(C.c_int)),
                 ("_p_total_flips", C.POINTER(C.c_int)),
-                ("_p_q", C.POINTER(C.c_float))]
+                ("_p_q", C.POINTER(C.c_double))]
 
     def __init__(self, sample_size, step_size=None, tolerance=None):
 
@@ -191,18 +191,18 @@ class Sample(C.Structure):
         self._fullname = None
 
         # Memoria asignada
-        self._energy = np.zeros(self._sample_size, dtype=C.c_float)
+        self._energy = np.zeros(self._sample_size, dtype=C.c_double)
         self._magnet = np.zeros(self._sample_size, dtype=C.c_int)
         self._flips = np.zeros(self._sample_size, dtype=C.c_int)
         self._total_flips = np.zeros(self._sample_size, dtype=C.c_int)
-        self._q = np.zeros(self._sample_size, dtype=C.c_float)
+        self._q = np.zeros(self._sample_size, dtype=C.c_double)
 
         # Punteros
-        self._p_energy = self._energy.ctypes.data_as(C.POINTER(C.c_float))
+        self._p_energy = self._energy.ctypes.data_as(C.POINTER(C.c_double))
         self._p_magnet = self._magnet.ctypes.data_as(C.POINTER(C.c_int))
         self._p_flips = self._flips.ctypes.data_as(C.POINTER(C.c_int))
         self._p_total_flips = self._total_flips.ctypes.data_as(C.POINTER(C.c_int))
-        self._p_q = self._q.ctypes.data_as(C.POINTER(C.c_float))
+        self._p_q = self._q.ctypes.data_as(C.POINTER(C.c_double))
 
     def save_as(self, fullname='', default='../data/samples/sample.npy'):
         fullname = Utilities.newname(fullname, default)
@@ -281,6 +281,12 @@ class Sample(C.Structure):
     @property
     def q(self): return self._q
 
+    def __repr__(self): return self._fullname
+    def __str__(self): return self._fullname + '\n' + self._print_params()
+
+    def _print_params(self):
+        return 'T=%.4f\nJ=%.4f\nB=%.4f'% (self._T, self._J, self._B)
+
     def view_energy(self, ax=None, **kwargs):
         Utilities.plot_hist(self.energy, ax=ax, **kwargs)
 
@@ -302,19 +308,19 @@ class Ising(C.Structure):
                 ("_n2", C.c_int),
                 ("_flips", C.c_int),
                 ("_total_flips", C.c_int),
-                ("_T", C.c_float),
-                ("_J", C.c_float),
-                ("_B", C.c_float),
-                ("_p_dEs", C.c_float * 10),
-                ("_p_exps", C.c_float * 10),
+                ("_T", C.c_double),
+                ("_J", C.c_double),
+                ("_B", C.c_double),
+                ("_p_dEs", C.c_double * 10),
+                ("_p_exps", C.c_double * 10),
                 ("_W", C.c_int),
                 ("_N", C.c_int),
                 ("_E", C.c_int),
                 ("_S", C.c_int),
                 ("_aligned", C.c_int),
-                ("_current_energy", C.c_float),
+                ("_current_energy", C.c_double),
                 ("_current_magnet", C.c_int),
-                ("_p_energy", C.POINTER(C.c_float)),
+                ("_p_energy", C.POINTER(C.c_double)),
                 ("_p_magnet", C.POINTER(C.c_int))]
 
     def __init__(self, n):
@@ -348,7 +354,7 @@ class Ising(C.Structure):
         self.C_info.restype = C.c_int
         self.C_metropolis.restype = C.c_int
         self.C_run.restype = C.c_int
-        self.C_run_until.restype = C.c_float
+        self.C_run_until.restype = C.c_double
         self.C_run_sample.restype = C.c_int
         self.C_pick_site.restype = C.c_int
         self.C_flip.restype = C.c_int
@@ -356,23 +362,23 @@ class Ising(C.Structure):
         self.C_cost.restype = C.c_int
         self.C_try_flip.restype = C.c_int
         self.C_accept_flip.restype = C.c_int
-        self.C_calc_pi.restype = C.c_float
-        self.C_calc_energy.restype = C.c_float
+        self.C_calc_pi.restype = C.c_double
+        self.C_calc_energy.restype = C.c_double
         self.C_calc_magnet.restype = C.c_int
         self.C_calc_lattice.restype = C.c_int
 
         self.C_init.argtypes = [C.POINTER(Ising), C.c_int]
-        self.C_set_params.argtypes = [C.POINTER(Ising), C.c_float, C.c_float, C.c_float]
+        self.C_set_params.argtypes = [C.POINTER(Ising), C.c_double, C.c_double, C.c_double]
         self.C_info.argtypes = [C.POINTER(Ising)]
         self.C_metropolis.argtypes = [C.POINTER(Ising), C.c_int]
         self.C_run.argtypes = [C.POINTER(Ising), C.c_int]
-        self.C_run_until.argtypes = [C.POINTER(Ising), C.c_int, C.c_float]
+        self.C_run_until.argtypes = [C.POINTER(Ising), C.c_int, C.c_double]
         self.C_run_sample.argtypes = [C.POINTER(Ising), C.POINTER(Sample)]
         self.C_pick_site.argtypes = [C.POINTER(Ising)]
         self.C_flip.argtypes = [C.POINTER(Ising), C.c_int]
         self.C_find_neighbors.argtypes = [C.POINTER(Ising), C.c_int]
         self.C_cost.argtypes = [C.POINTER(Ising), C.c_int]
-        self.C_try_flip.argtypes = [C.POINTER(Ising), C.c_float]
+        self.C_try_flip.argtypes = [C.POINTER(Ising), C.c_double]
         self.C_accept_flip.argtypes = [C.POINTER(Ising), C.c_int, C.c_int]
         self.C_calc_pi.argtypes = [C.POINTER(Ising), C.c_int, C.c_int]
         self.C_calc_energy.argtypes = [C.POINTER(Ising), C.c_int]
@@ -420,8 +426,8 @@ class Ising(C.Structure):
     def step_size(self, value):
         if self._step_size != value:
             self._step_size = value
-            self._energy = np.zeros(self._step_size, dtype=C.c_float)
-            self._p_energy = self._energy.ctypes.data_as(C.POINTER(C.c_float))
+            self._energy = np.zeros(self._step_size, dtype=C.c_double)
+            self._p_energy = self._energy.ctypes.data_as(C.POINTER(C.c_double))
             self._magnet = np.zeros(self._step_size, dtype=C.c_int)
             self._p_magnet = self._magnet.ctypes.data_as(C.POINTER(C.c_int))
 
@@ -552,7 +558,7 @@ class Simulation():
         self._sample_names = list()
         self._state_names = list()
 
-    def sweep(self, parameter, end, sweep_step=None,
+    def sweep(self, parameter, end, sweep_step='auto',
                     sample_size=100, ising_step='auto', therm='auto'):
 
         if therm == 'auto':
@@ -576,6 +582,9 @@ class Simulation():
             print('"Interaction"  or "J"')
             print('"Extern field" or "B"')
             return 0
+
+        if sweep_step is 'auto':
+            sweep_step = 0.1
 
         values = np.arange(start, end, sweep_step)
         n = float(len(values))
@@ -662,9 +671,18 @@ class Simulation():
 
     def __len__(self): return len(self._sample_names)
     def __getitem__(self, key):
-        return self._params[key], self._sample_names[key], self._state_names[key]
-    def __delitem__(self, key):
-        self._params.pop(key), self._sample_names.pop(key), self._state_names.pop(key)
+        return self._sample_names[key], self._state_names[key]
+
+    def __repr__(self): return self._fullname
+    def __str__(self): return self._fullname
+
+    def iter(self, a, b=None, step=1):
+        start = 0 if b is None else a
+        end = a if b is None else b
+        i = start
+        while i < end:
+            yield self[i]
+            i += step
 
     @classmethod
     def load(cls, fullname, default='../data/simulations/sim.npy'):
@@ -683,5 +701,3 @@ class Simulation():
         simulation._fullname = fullname
 
         return simulation
-
-#class Analysis

@@ -11,13 +11,13 @@ int main(int argc, char **argv)
     Ising *ising;
     int n = 32;
 
-    float prob=0.5;
+    double prob=0.5;
     int niter = 1000;
     int pasos = 1000;
 
-    float T = 2.0;
-    float J = 1.0;
-    float B = 0.0;
+    double T = 2.0;
+    double J = 1.0;
+    double B = 0.0;
 
     if (argc > 1)
     {
@@ -32,8 +32,8 @@ int main(int argc, char **argv)
 
     ising = malloc(sizeof(Ising));
     ising -> _p_lattice = malloc(n*n*sizeof(int));
-	ising -> _p_energy = malloc(pasos * sizeof(int));
-	ising -> _p_magnet = malloc(pasos * sizeof(int));
+    ising -> _p_energy = malloc(pasos * sizeof(double));
+    ising -> _p_magnet = malloc(pasos * sizeof(double));
 
     init(ising, n);
     set_params(ising, T, J, B);
