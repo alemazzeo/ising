@@ -31,7 +31,7 @@ class Bimodal():
 
     @classmethod
     def bimodal_poisson(cls, k, A, lamb):
-        return (A * cls.poisson(k, lamb) + (1-A) * cls.poisson(1-k,lamb))
+        return (A * cls.poisson(k, lamb) + (1-A) * cls.poisson(20-k,lamb))
 
     @classmethod
     def fit_gaussian(cls, data, expected=None, plot=False):
@@ -103,9 +103,8 @@ class Bimodal():
     @classmethod
     def hist(cls, data, ax=None, **kwargs):
         params = {'normed': True,
-                   'label': 'Input data',
-                   'bins': 'sqrt',
-                   'alpha': 0.3}
+                  'label': 'Input data',
+                  'alpha': 0.3}
         params.update(kwargs)
 
         if ax is None:
