@@ -11,7 +11,7 @@ except ImportError:
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
-from scipy.stats import gaussian_kde
+from scipy.stats import gaussian_kde, exponnorm
 from scipy.signal import find_peaks_cwt
 from scipy.misc import factorial
 
@@ -34,16 +34,21 @@ class Bimodal():
         return (A * cls.poisson(k, lamb) + (1-A) * cls.poisson(20-k,lamb))
 
     @classmethod
-    def fit_gaussian(cls, data, expected=None, plot=False):
-        y, x = np.histogram(data, bins='sqrt', density=True)
+    def expnorm(cls, x, mu, sigma, lamb, A):
+        return A * exponnorm.pdf(x, 1/(lamb*sigma), loc=mu, scale=sigma)
+
+    @classmethod
+    def fit_gaussian(cls, data, expected=None, bounds=(-np.inf,np.inf), plot=False, ax=None):
+        y, x = np.histogram(data, density=True)
         x = (x[1:] + x[:-1]) / 2
 
-        params, cov = curve_fit(cls.gauss, x, y, expected)
+        params, cov = curve_fit(cls.gauss, x, y, expected, bounds=bounds)
         sigma = np.sqrt(np.diag(cov))
 
         if plot:
-            plt.ion()
-            fig, ax = plt.subplots(1)
+            if ax is None:
+                plt.ion()
+                fig, ax = plt.subplots(1)
             cls.hist(data, ax=ax)
             cls.plot_gauss(x, *params[0:3], ax=ax, label='Gaussian', color='blue')
             ax.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
@@ -51,16 +56,17 @@ class Bimodal():
         return params, sigma
 
     @classmethod
-    def fit_bimodal(cls, data, expected=None, plot=False):
-        y, x = np.histogram(data, bins='sqrt', density=True)
+    def fit_bimodal(cls, data, expected=None, bounds=(-np.inf,np.inf), plot=False, ax=None):
+        y, x = np.histogram(data, density=True)
         x = (x[1:] + x[:-1]) / 2
 
-        params, cov = curve_fit(cls.bimodal_gauss, x, y, expected)
+        params, cov = curve_fit(cls.bimodal_gauss, x, y, expected, bounds=bounds)
         sigma = np.sqrt(np.diag(cov))
 
         if plot:
-            plt.ion()
-            fig, ax = plt.subplots(1)
+            if ax is None:
+                plt.ion()
+                fig, ax = plt.subplots(1)
             cls.hist(data, ax=ax)
             cls.plot_gauss(x, *params[0:3], ax=ax, label='Gaussian 1', color='blue')
             cls.plot_gauss(x, *params[3:6], ax=ax, label='Gaussian 2', color='black')
@@ -70,29 +76,31 @@ class Bimodal():
         return params, sigma
 
     @classmethod
-    def gaussian_pdf(cls, data, plot=False):
+    def gaussian_pdf(cls, data, plot=False, ax=None):
         y, x = np.histogram(data, bins='sqrt', density=True)
         x = (x[1:] + x[:-1]) / 2
         f = gaussian_kde(data)
         if plot:
-            plt.ion()
-            fig, ax = plt.subplots(1)
+            if ax is None:
+                plt.ion()
+                fig, ax = plt.subplots(1)
             cls.hist(data, ax=ax)
             cls.plot_pdf(data, ax=ax)
         return f, x, y
 
     @classmethod
-    def estimate_pdf_peaks(cls, data, widths=None, plot=False):
+    def estimate_pdf_peaks(cls, data, widths=None, plot=False, ax=None):
         f, x, y = cls.gaussian_pdf(data)
         y_pdf = f(x)
 
         if widths is None:
-            widths = np.arange(1,20)
+            widths = np.arange(10, int(len(x)/2))
         peakind = find_peaks_cwt(y_pdf, widths)
 
         if plot:
-            plt.ion()
-            fig, ax = plt.subplots(1)
+            if ax is None:
+                plt.ion()
+                fig, ax = plt.subplots(1)
             cls.hist(data, ax=ax)
             cls.plot_pdf(x, y_pdf, ax=ax, label='PDF', color='blue')
             for peak in peakind:

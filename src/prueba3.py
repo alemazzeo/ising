@@ -13,7 +13,7 @@ from analysis import Analysis, Result
 from bimodal import Bimodal
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import beta
+from scipy.stats import beta, mode
 
 sim1 = Simulation.load('../data/simulations/1stSweep0.npy')
 
@@ -29,6 +29,8 @@ for i in range(35):
     x = np.linspace(-1,1,100)
     params = beta.fit(magnet)
     rv = beta(*params)
+    modes = mode(magnet)
+    print (modes)
     ax.plot(x, rv.pdf(x), 'k-', lw=2, label='frozen pdf')
 
     ax.relim()
