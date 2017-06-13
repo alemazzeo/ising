@@ -42,7 +42,7 @@ def classificate(data, ax):
             return 'Positive', mu, A
 
         elif xpeaks[0] < -0.5:
-            mu = xpeaks[0]
+            mu = xpeaks[0]x
             A = ypeaks[0]
             return 'Negative', mu, A
 
@@ -88,8 +88,6 @@ def test(fig, ax, result, state):
 
     pdf_type, mu, A = classificate(magnet, ax)
     print(pdf_type, mu, A)
-
-
 
     ax.axvline(mu, color='r', lw=5, alpha=0.5)
     if pdf_type == 'Bimodal':
