@@ -124,6 +124,7 @@ int run_sample(Ising *self, Sample *result)
 
 	size = (result -> _sample_size);
 
+	result -> _n = self -> _n;
 	result -> _T = self -> _T;
 	result -> _J = self -> _J;
 	result -> _B = self -> _B;

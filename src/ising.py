@@ -10,168 +10,13 @@ except ImportError:
 import ctypes as C
 import numpy as np
 import matplotlib.pyplot as plt
-import os
-import shutil
 
-class Utilities():
+from tools import Tools
 
-    @classmethod
-    def splitname(cls, fullname):
-        fullname, extension = os.path.splitext(fullname)
-        path, name = os.path.split(fullname)
-        return path, name, extension
-
-    @classmethod
-    def newname(cls, fullname, default='../data/temp.npy'):
-        path, name, extension = cls.splitname(fullname)
-        dpath, dname, dext = cls.splitname(default)
-
-        if extension == '':
-            extension = dext
-
-        if path == '':
-            path = dpath
-
-        os.makedirs(path, exist_ok=True)
-
-        if name == '':
-            name = dname
-
-        if os.path.isfile(path+'/'+name+'0'+extension):
-            i = 0
-            newname = name + str(i)
-            while os.path.isfile(path+'/'+newname+extension):
-                i += 1
-                newname = name + str(i)
-            name = newname
-        else:
-            name = name + '0'
-
-        return path + '/' + name + extension
-
-    @classmethod
-    def lastname(cls, fullname, default='../data/temp.npy'):
-        path, name, extension = cls.splitname(cls.newname(fullname, default))
-        return path + '/' + name[:-1] + str(int(name[-1])-1) + extension
-
-    @classmethod
-    def move(cls, files, dest, copy=False, verbose=False):
-        changes = list()
-        newlist = list()
-        for fullname in files:
-            path, name, extension = cls.splitname(fullname)
-            dpath, dname, dextension = cls.splitname(dest)
-
-            if (path==dpath and name[:len(dname)]==dname):
-                newlist.append(fullname)
-            else:
-                newname = cls.newname(dest)
-                if copy:
-                    shutil.copyfile(fullname, newname)
-                    if verbose:
-                        print(fullname + ' copy to ' + newname)
-                else:
-                    os.rename(fullname, newname)
-                    if verbose:
-                        print(fullname + ' move to ' + newname)
-
-                newlist.append(newname)
-                changes.append([fullname, newname])
-
-        return newlist, changes
-
-    @classmethod
-    def plot_array1D(cls, data, ax=None, **kwargs):
-        params = {'label': 'Last step',
-                  'lw': 2,
-                  'ls': '-'}
-        params.update(kwargs)
-        data = np.trim_zeros(data)
-        if ax is None:
-            plt.ion()
-            fig, ax = plt.subplots(1)
-
-        curve, = ax.plot(data, **params)
-        return curve
-
-    @classmethod
-    def plot_hist(cls, data, ax=None, **kwargs):
-        params = {}
-        params.update(kwargs)
-        data = np.trim_zeros(data)
-        if ax is None:
-            plt.ion()
-            fig, ax = plt.subplots(1)
-
-        Y, X, _ = ax.hist(data, **params)
-        return [Y, X], ax, fig
-
-    @classmethod
-    def plot_lattice(cls, data1D, ax=None, **kwargs):
-        params = {'vmin': -1,
-                  'vmax': 1,
-                  'cmap': 'gray'}
-        params.update(kwargs)
-
-        n = int(len(data1D)**0.5)
-        data = np.reshape(data1D,(n,n))
-
-        if ax is None:
-            plt.ion()
-            fig, ax = plt.subplots(1)
-
-        curve = ax.matshow(data, **params)
-        return curve, ax, fig
-
-    @classmethod
-    def plot_correlation(cls, data, ax=None,
-                         plot1_kw=dict(label='Data'),
-                         plot2_kw=dict(label='Autocorrelation')):
-        n = len(data)
-        assert ax==None or len(ax) == 2
-        if ax is None:
-            plt.ion()
-            fig, ax = plt.subplots(2)
-
-        x = data[0:int(n/100)]
-        acorr = cls.autocorrelation(x)
-        curve_d = cls.plot_step(x, ax=ax[0], **plot1_kw)
-        curve_a = cls.plot_step(acorr, ax=ax[1], **plot2_kw)
-
-        for i in range(99):
-            x = data[0:int(n*(i+2)/100)]
-            acorr = cls.autocorrelation(x)
-            curve_d.set_data(np.arange(x.size), x)
-            curve_a.set_data(np.arange(acorr.size), acorr)
-            ax[0].relim()
-            ax[1].relim()
-            ax[0].autoscale()
-            ax[1].autoscale()
-            plt.draw()
-            plt.pause(0.00001)
-
-        return curve_d, curve_a, ax, fig
-
-    @classmethod
-    def autocorrelation (cls, x):
-        xp = x-np.mean(x)
-        f = np.fft.fft(xp)
-        p = np.array([np.real(v)**2+np.imag(v)**2 for v in f])
-        pi = np.fft.ifft(p)
-        return np.real(pi)[:int(x.size/2)]/np.sum(xp**2)
-
-    @classmethod
-    def autocorrelation2(cls, x):
-        n = len(x)
-        var = np.var(x)
-        acorr = np.zeros(n, dtype=float)
-        for k in range(n):
-            acorr[k] = np.sum((x[0:n-k]-np.mean(x[0:n-k]))
-                              *(x[k:n]-np.mean(x[k:n]))) / (n*var)
-        return acorr
 
 class Sample(C.Structure):
-    _fields_ = [("_sample_size", C.c_int),
+    _fields_ = [("_n", C.c_int),
+                ("_sample_size", C.c_int),
                 ("_step_size", C.c_int),
                 ("_tolerance", C.c_double),
                 ("_T", C.c_double),
@@ -190,14 +35,14 @@ class Sample(C.Structure):
         self._tolerance = tolerance
         self._fullname = None
 
-        # Memoria asignada
+        # Memory alloc
         self._energy = np.zeros(self._sample_size, dtype=C.c_double)
         self._magnet = np.zeros(self._sample_size, dtype=C.c_int)
         self._flips = np.zeros(self._sample_size, dtype=C.c_int)
         self._total_flips = np.zeros(self._sample_size, dtype=C.c_int)
         self._q = np.zeros(self._sample_size, dtype=C.c_double)
 
-        # Punteros
+        # Pointers
         self._p_energy = self._energy.ctypes.data_as(C.POINTER(C.c_double))
         self._p_magnet = self._magnet.ctypes.data_as(C.POINTER(C.c_int))
         self._p_flips = self._flips.ctypes.data_as(C.POINTER(C.c_int))
@@ -205,7 +50,7 @@ class Sample(C.Structure):
         self._p_q = self._q.ctypes.data_as(C.POINTER(C.c_double))
 
     def save_as(self, fullname='', default='../data/samples/sample.npy'):
-        fullname = Utilities.newname(fullname, default)
+        fullname = Tools.newname(fullname, default)
         self._fullname = fullname
         if self.save():
             return fullname
@@ -222,7 +67,8 @@ class Sample(C.Structure):
                   self._tolerance,
                   self._T,
                   self._J,
-                  self._B]
+                  self._B,
+                  self._n]
 
         data = [self._energy,
                 self._magnet,
@@ -235,8 +81,8 @@ class Sample(C.Structure):
 
     @classmethod
     def load(cls, fullname, default='../data/samples/sample.npy'):
-        path, name, extension = Utilities.splitname(fullname)
-        dpath, dname, dextension = Utilities.splitname(default)
+        path, name, extension = Tools.splitname(fullname)
+        dpath, dname, dextension = Tools.splitname(default)
 
         if path == '':
             path = dpath
@@ -256,6 +102,7 @@ class Sample(C.Structure):
         load_sample._T = float(params[3])
         load_sample._J = float(params[4])
         load_sample._B = float(params[5])
+        load.sample._n = float(params[6])
 
         load_sample._energy = data[0]
         load_sample._magnet = data[1]
@@ -288,19 +135,19 @@ class Sample(C.Structure):
         return 'T=%.4f\nJ=%.4f\nB=%.4f'% (self._T, self._J, self._B)
 
     def view_energy(self, ax=None, **kwargs):
-        Utilities.plot_hist(self.energy, ax=ax, **kwargs)
+        Tools.plot_hist(self.energy, ax=ax, **kwargs)
 
     def view_magnet(self, ax=None, **kwargs):
-        Utilities.plot_hist(self.magnet, ax=ax, **kwargs)
+        Tools.plot_hist(self.magnet, ax=ax, **kwargs)
 
     def view_flips(self, ax=None, **kwargs):
-        Utilities.plot_array1D(self.flips, ax=ax, **kwargs)
+        Tools.plot_array1D(self.flips, ax=ax, **kwargs)
 
     def view_total_flips(self, ax=None, **kwargs):
-        Utilities.plot_array1D(self.total_flips, ax=ax, **kwargs)
+        Tools.plot_array1D(self.total_flips, ax=ax, **kwargs)
 
     def view_q(self, ax=None, **kwargs):
-        Utilities.plot_array1D(self.q, ax=ax, **kwargs)
+        Tools.plot_array1D(self.q, ax=ax, **kwargs)
 
 class Ising(C.Structure):
     _fields_ = [("_p_lattice", C.POINTER(C.c_int)),
@@ -328,9 +175,10 @@ class Ising(C.Structure):
         self._n = n
         self._step_size = None
 
-        # Biblioteca de funciones
+        # C Library
         self._lib = C.CDLL('./libising.so')
 
+        # Functions
         self.C_init = self._lib.init
         self.C_set_params = self._lib.set_params
         self.C_info = self._lib.info
@@ -349,6 +197,7 @@ class Ising(C.Structure):
         self.C_calc_magnet = self._lib.calc_magnet
         self.C_calc_lattice = self._lib.calc_lattice
 
+        # Return types
         self.C_init.restype = C.c_int
         self.C_set_params.restype = C.c_int
         self.C_info.restype = C.c_int
@@ -367,6 +216,7 @@ class Ising(C.Structure):
         self.C_calc_magnet.restype = C.c_int
         self.C_calc_lattice.restype = C.c_int
 
+        # Arguments types
         self.C_init.argtypes = [C.POINTER(Ising), C.c_int]
         self.C_set_params.argtypes = [C.POINTER(Ising), C.c_double, C.c_double, C.c_double]
         self.C_info.argtypes = [C.POINTER(Ising)]
@@ -385,11 +235,11 @@ class Ising(C.Structure):
         self.C_calc_magnet.argtypes = [C.POINTER(Ising), C.c_int]
         self.C_calc_lattice.argtypes = [C.POINTER(Ising)]
 
-        # Asigna la memoria para energy, magnet y lattice
+        # Step size and first fill
         self.step_size = int(1.5 * n**2)
         self.fill_random()
 
-        # Inicializa los valores
+        # Init values and calc magnet and energy
         self.C_init(self, n)
         self.C_calc_lattice(self)
 
@@ -482,6 +332,7 @@ class Ising(C.Structure):
         self.C_run_sample(self, data)
         return data
 
+
 class State(Ising):
     def __init__(self, n):
 
@@ -489,7 +340,7 @@ class State(Ising):
         self._fullname = None
 
     def save_as(self, fullname='', default='../data/states/state.npy'):
-        fullname = Utilities.newname(fullname, default)
+        fullname = Tools.newname(fullname, default)
         self._fullname = fullname
         if self.save():
             return fullname
@@ -509,13 +360,13 @@ class State(Ising):
 
         data = self._lattice
 
-        np.save(self._fullname, [params,data])
+        np.save(self._fullname, [params, data])
         return self._fullname
 
     @classmethod
     def load(cls, fullname, default='../data/states/state.npy'):
-        path, name, extension = Utilities.splitname(fullname)
-        dpath, dname, dextension = Utilities.splitname(default)
+        path, name, extension = Tools.splitname(fullname)
+        dpath, dname, dextension = Tools.splitname(default)
 
         if path == '':
             path = dpath
@@ -528,7 +379,7 @@ class State(Ising):
 
         params, data = np.load(fullname)
 
-        load_state = cls(n = int(params[0]))
+        load_state = cls(n=int(params[0]))
         load_state._total_flips = int(params[1])
 
         load_state.T = float(params[2])
@@ -536,12 +387,18 @@ class State(Ising):
         load_state.B = float(params[4])
 
         load_state._lattice = data
-        load_state._p_lattice = load_state._lattice.ctypes.data_as(C.POINTER(C.c_int))
+        pointer = load_state._lattice.ctypes.data_as(C.POINTER(C.c_int))
+        load_state._p_lattice = pointer
         load_state.calc_lattice()
         load_state._fullname = fullname
 
         return load_state
 
+    def plot_lattice(self, ax=None, **kwargs):
+        curve, ax, fig = Tools.plot_lattice(self._lattice, ax=ax, **kwargs)
+        return curve, ax, fig
+
+    
 class Simulation():
     def __init__(self, state):
 
@@ -559,7 +416,7 @@ class Simulation():
         self._state_names = list()
 
     def sweep(self, parameter, end, sweep_step='auto',
-                    sample_size=100, ising_step='auto', therm='auto'):
+              sample_size=100, ising_step='auto', therm='auto'):
 
         if therm == 'auto':
             therm = self._state._n2 * 50
@@ -595,7 +452,8 @@ class Simulation():
         for i, value in np.ndenumerate(values):
             j = int(m*(i[0]+1)/n)
             text_bar = '*' * j + '-' * (m-j)
-            print(parameter + ' = %.4f - '%(value) + text_bar + '  ', end='\r')
+            print(parameter + ' = %.4f - ' % (value) + text_bar + '  ',
+                  end='\r')
 
             # Set T and run until thermalization
             set_value(value)
@@ -616,7 +474,8 @@ class Simulation():
 
         print('Sweep completed.' + ' ' * (m+len(parameter)))
 
-    def save_as(self, fullname, default='../data/simulations/sim.npy', verbose=False):
+    def save_as(self, fullname, default='../data/simulations/sim.npy',
+                verbose=False):
         if len(self._state_names) == 0:
             return 'Simulation is empty'
 
@@ -626,7 +485,7 @@ class Simulation():
         else:
             copy_data = False
 
-        fullname = Utilities.newname(fullname, default)
+        fullname = Tools.newname(fullname, default)
 
         self._fullname = fullname
         if self.save(copy=copy_data, verbose=verbose):
@@ -651,18 +510,18 @@ class Simulation():
         return self._fullname
 
     def save_data(self, copy=False, verbose=False):
-        path, name, extension = Utilities.splitname(self._fullname)
+        path, name, extension = Tools.splitname(self._fullname)
         sample_names = path + '/' + name + '/samples/sample.npy'
         state_names = path + '/' + name + '/states/state.npy'
 
         if verbose: print('Moving new samples to folder...')
-        self._sample_names, ch1 = Utilities.move(files=self._sample_names,
+        self._sample_names, ch1 = Tools.move(files=self._sample_names,
                                                  dest=sample_names,
                                                  copy=copy,
                                                  verbose=verbose)
 
         if verbose: print('Moving new states to folder...')
-        self._state_names, ch2 = Utilities.move(files=self._state_names,
+        self._state_names, ch2 = Tools.move(files=self._state_names,
                                                 dest=state_names,
                                                 copy=copy,
                                                 verbose=verbose)
@@ -670,10 +529,12 @@ class Simulation():
         return ch1, ch2
 
     def __len__(self): return len(self._sample_names)
+
     def __getitem__(self, key):
         return self._sample_names[key], self._state_names[key]
 
     def __repr__(self): return self._fullname
+
     def __str__(self): return self._fullname
 
     def iter(self, a, b=None, step=1):
@@ -686,12 +547,12 @@ class Simulation():
 
     @classmethod
     def load(cls, fullname, default='../data/simulations/sim.npy'):
-        path, name, extension = Utilities.splitname(fullname)
-        dpath, dname, dextension = Utilities.splitname(default)
+        path, name, extension = Tools.splitname(fullname)
+        dpath, dname, dextension = Tools.splitname(default)
 
         fullname = path + '/' + name + extension
 
-        params, sample_names, state_names  = np.load(fullname)
+        params, sample_names, state_names = np.load(fullname)
 
         state = State.load(state_names[-1])
         simulation = cls(state)

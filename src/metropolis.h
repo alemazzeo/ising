@@ -23,15 +23,16 @@ typedef struct _ising Ising;
 
 struct _sample
 {
-	int    _sample_size;
-	int    _step_size;
-	double _tolerance;
-	double _T, _J, _B;
-	double *_p_energy;
-	int    *_p_magnet;
-	int    *_p_flips;
-	int    *_p_total_flips;
-	double *_p_q;
+    int    _n;
+    int    _sample_size;
+    int    _step_size;
+    double _tolerance;
+    double _T, _J, _B;
+    double *_p_energy;
+    int    *_p_magnet;
+    int    *_p_flips;
+    int    *_p_total_flips;
+    double *_p_q;
 };
 
 typedef struct _sample Sample;
