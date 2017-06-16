@@ -415,8 +415,33 @@ class Simulation():
         self._sample_names = list()
         self._state_names = list()
 
-    def sweep(self, parameter, end, sweep_step='auto',
-              sample_size=100, ising_step='auto', therm='auto'):
+    @property
+    def T(self): return self._state.T
+
+    @T.setter
+    def T(self, value): self._state.T = value
+
+    @property
+    def J(self): return self._state.J
+
+    @J.setter
+    def J(self, value): self._state.J = value
+
+    @property
+    def B(self): return self._state.B
+
+    @B.setter
+    def B(self, value): self._state.B = value
+
+    def therm(self, T=None, J=None, B=None, therm='auto'):
+        if therm == 'auto':
+            therm = self._state._n2 * 50
+
+        self._state._set(T=T, J=J, B=B)
+        self._state.run_until(therm)
+
+    def sweep(self, T=None, sweep_step='auto', sample_size=100,
+              ising_step='auto', therm='auto', J=None, B=None):
 
         if therm == 'auto':
             therm = self._state._n2 * 50
@@ -424,21 +449,26 @@ class Simulation():
         if ising_step == 'auto':
             ising_step = self._state._n2 * 2
 
-        if parameter in ('T', 'Temperature'):
+        if T is not None and B is None and J is None:
             start = self._state.T
+            end = T
+            parameter = 'Temperature'
             set_value = lambda value: self._state._set(T=value)
-        elif parameter in ('J', 'Interaction'):
+
+        elif J is not None and T is None and B is None:
             start = self._state.J
+            end = J
+            parameter = 'Interaction'
             set_value = lambda value: self._state._set(J=value)
-        elif parameter in ('B', 'Extern field'):
+
+        elif B is not None and T is None and J is None:
             start = self._state.B
+            end = B
+            parameter = 'Extern Field'
             set_value = lambda value: self._state._set(B=value)
+
         else:
-            print('Available parameters to sweep:')
-            print('"Temperature"  or "T"')
-            print('"Interaction"  or "J"')
-            print('"Extern field" or "B"')
-            return 0
+            raise ValueError
 
         if sweep_step is 'auto':
             sweep_step = 0.1
@@ -455,7 +485,6 @@ class Simulation():
             print(parameter + ' = %.4f - ' % (value) + text_bar + '  ',
                   end='\r')
 
-            # Set T and run until thermalization
             set_value(value)
             self._state.run_until(therm)
 
@@ -516,15 +545,15 @@ class Simulation():
 
         if verbose: print('Moving new samples to folder...')
         self._sample_names, ch1 = Tools.move(files=self._sample_names,
-                                                 dest=sample_names,
-                                                 copy=copy,
-                                                 verbose=verbose)
+                                             dest=sample_names,
+                                             copy=copy,
+                                             verbose=verbose)
 
         if verbose: print('Moving new states to folder...')
         self._state_names, ch2 = Tools.move(files=self._state_names,
-                                                dest=state_names,
-                                                copy=copy,
-                                                verbose=verbose)
+                                            dest=state_names,
+                                            copy=copy,
+                                            verbose=verbose)
 
         return ch1, ch2
 
