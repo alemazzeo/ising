@@ -226,6 +226,7 @@ class Tools():
 
     @classmethod
     def estimate_pdf(cls, data, plot=False, ax=None):
+        print(data)
         y, x = np.histogram(data, bins='auto', density=True)
         x = (x[1:] + x[:-1]) / 2
         f = gaussian_kde(data)

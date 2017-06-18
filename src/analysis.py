@@ -77,6 +77,7 @@ class Analysis():
 
     @property
     def current(self): return self._current
+
     @current.setter
     def current(self, value):
         assert 0 < value < self._n
@@ -90,6 +91,7 @@ class Analysis():
     def left(self, n=1):
         if self._current - n > 0:
             self.current -= n
+
 
 class Result():
     def __init__(self, sample_name, autofit=False):
@@ -118,7 +120,7 @@ class Result():
     @property
     def magnet_array(self):
         sample = Sample.load(self._sample_name)
-        return sample.magnet / sample._n
+        return sample.magnet
 
     @property
     def energy_array(self):
@@ -135,8 +137,9 @@ class Result():
 
     def fit(self, cls_ax=None, prefit_ax=None, fit_ax=None):
 
-        magnet = self.magnet_array
+        magnet = self.magnet_array/1024
         energy = self.energy_array
+        print(magnet)
 
         if cls_ax is not None:
             plot_cls = True

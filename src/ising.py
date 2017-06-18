@@ -67,8 +67,7 @@ class Sample(C.Structure):
                   self._tolerance,
                   self._T,
                   self._J,
-                  self._B,
-                  self._n]
+                  self._B]
 
         data = [self._energy,
                 self._magnet,
@@ -102,7 +101,6 @@ class Sample(C.Structure):
         load_sample._T = float(params[3])
         load_sample._J = float(params[4])
         load_sample._B = float(params[5])
-        load.sample._n = float(params[6])
 
         load_sample._energy = data[0]
         load_sample._magnet = data[1]
@@ -117,7 +115,7 @@ class Sample(C.Structure):
     def energy(self): return self._energy
 
     @property
-    def magnet(self): return self._magnet
+    def magnet(self): return self._magnet / (self._n**2)
 
     @property
     def flips(self): return self._flips
@@ -218,7 +216,8 @@ class Ising(C.Structure):
 
         # Arguments types
         self.C_init.argtypes = [C.POINTER(Ising), C.c_int]
-        self.C_set_params.argtypes = [C.POINTER(Ising), C.c_double, C.c_double, C.c_double]
+        self.C_set_params.argtypes = [C.POINTER(Ising), C.c_double,
+                                      C.c_double, C.c_double]
         self.C_info.argtypes = [C.POINTER(Ising)]
         self.C_metropolis.argtypes = [C.POINTER(Ising), C.c_int]
         self.C_run.argtypes = [C.POINTER(Ising), C.c_int]
@@ -245,16 +244,19 @@ class Ising(C.Structure):
 
     @property
     def T(self): return self._T
+    
     @T.setter
     def T(self, value): self._set(T=value)
 
     @property
     def J(self): return self._J
+    
     @J.setter
     def J(self, value): self._set(J=value)
 
     @property
     def B(self): return self._B
+    
     @B.setter
     def B(self, value): self._set(B=value)
 
@@ -335,7 +337,6 @@ class Ising(C.Structure):
 
 class State(Ising):
     def __init__(self, n):
-
         super().__init__(n)
         self._fullname = None
 
