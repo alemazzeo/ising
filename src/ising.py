@@ -26,14 +26,16 @@ class Sample(C.Structure):
                 ("_p_magnet", C.POINTER(C.c_int)),
                 ("_p_flips", C.POINTER(C.c_int)),
                 ("_p_total_flips", C.POINTER(C.c_int)),
-                ("_p_q", C.POINTER(C.c_double))]
+                ("_p_q", C.POINTER(C.c_double)),
+                ("_v2", C.c_int)]
 
-    def __init__(self, sample_size, step_size=None, tolerance=None):
+    def __init__(self, sample_size, step_size=None, tolerance=None, v2=False):
 
         self._sample_size = sample_size
         self._step_size = step_size
         self._tolerance = tolerance
         self._fullname = None
+        self._v2 = v2
 
         # Memory alloc
         self._energy = np.zeros(self._sample_size, dtype=C.c_double)
@@ -67,7 +69,8 @@ class Sample(C.Structure):
                   self._tolerance,
                   self._T,
                   self._J,
-                  self._B]
+                  self._B,
+                  self._v2]
 
         data = [self._energy,
                 self._magnet,
@@ -101,6 +104,7 @@ class Sample(C.Structure):
         load_sample._T = float(params[3])
         load_sample._J = float(params[4])
         load_sample._B = float(params[5])
+        load_sample._v2 = params[6]
 
         load_sample._energy = data[0]
         load_sample._magnet = data[1]
@@ -156,22 +160,19 @@ class Ising(C.Structure):
                 ("_T", C.c_double),
                 ("_J", C.c_double),
                 ("_B", C.c_double),
-                ("_p_dEs", C.c_double * 10),
-                ("_p_exps", C.c_double * 10),
-                ("_W", C.c_int),
-                ("_N", C.c_int),
-                ("_E", C.c_int),
-                ("_S", C.c_int),
-                ("_aligned", C.c_int),
+                ("_p_dEs", C.c_double * 18),
+                ("_p_exps", C.c_double * 18),
                 ("_current_energy", C.c_double),
                 ("_current_magnet", C.c_int),
                 ("_p_energy", C.POINTER(C.c_double)),
-                ("_p_magnet", C.POINTER(C.c_int))]
+                ("_p_magnet", C.POINTER(C.c_int)),
+                ("_v2", C.c_int)]
 
-    def __init__(self, n):
+    def __init__(self, n, v2=False):
 
         self._n = n
         self._step_size = None
+        self._v2 = v2
 
         # C Library
         self._lib = C.CDLL('./libising.so')
@@ -181,12 +182,18 @@ class Ising(C.Structure):
         self.C_set_params = self._lib.set_params
         self.C_info = self._lib.info
         self.C_metropolis = self._lib.metropolis
+        self.C_metropolis_v2 = self._lib.metropolis_v2
         self.C_run = self._lib.run
+        self.C_run_v2 = self._lib.run_v2
         self.C_run_until = self._lib.run_until
+        self.C_run_until_v2 = self._lib.run_until_v2
         self.C_run_sample = self._lib.run_sample
+        self.C_run_sample_v2 = self._lib.run_sample_v2
         self.C_pick_site = self._lib.pick_site
         self.C_flip = self._lib.flip
-        self.C_find_neighbors = self._lib.find_neighbors
+        self.C_flip_v2 = self._lib.flip_v2
+        self.C_first_neighbors = self._lib.first_neighbors
+        self.C_second_neighbors = self._lib.second_neighbors
         self.C_cost = self._lib.cost
         self.C_try_flip = self._lib.try_flip
         self.C_accept_flip = self._lib.accept_flip
@@ -194,18 +201,25 @@ class Ising(C.Structure):
         self.C_calc_energy = self._lib.calc_energy
         self.C_calc_magnet = self._lib.calc_magnet
         self.C_calc_lattice = self._lib.calc_lattice
+        self.C_calc_lattice_v2 = self._lib.calc_lattice_v2
 
         # Return types
         self.C_init.restype = C.c_int
         self.C_set_params.restype = C.c_int
         self.C_info.restype = C.c_int
         self.C_metropolis.restype = C.c_int
+        self.C_metropolis_v2.restype = C.c_int
         self.C_run.restype = C.c_int
+        self.C_run_v2.restype = C.c_int
         self.C_run_until.restype = C.c_double
+        self.C_run_until_v2.restype = C.c_double
         self.C_run_sample.restype = C.c_int
+        self.C_run_sample_v2.restype = C.c_int
         self.C_pick_site.restype = C.c_int
         self.C_flip.restype = C.c_int
-        self.C_find_neighbors.restype = C.c_int
+        self.C_flip_v2.restype = C.c_int
+        self.C_first_neighbors.restype = C.c_int
+        self.C_second_neighbors.restype = C.c_int
         self.C_cost.restype = C.c_int
         self.C_try_flip.restype = C.c_int
         self.C_accept_flip.restype = C.c_int
@@ -213,6 +227,7 @@ class Ising(C.Structure):
         self.C_calc_energy.restype = C.c_double
         self.C_calc_magnet.restype = C.c_int
         self.C_calc_lattice.restype = C.c_int
+        self.C_calc_lattice_v2.restype = C.c_int
 
         # Arguments types
         self.C_init.argtypes = [C.POINTER(Ising), C.c_int]
@@ -220,19 +235,26 @@ class Ising(C.Structure):
                                       C.c_double, C.c_double]
         self.C_info.argtypes = [C.POINTER(Ising)]
         self.C_metropolis.argtypes = [C.POINTER(Ising), C.c_int]
+        self.C_metropolis_v2.argtypes = [C.POINTER(Ising), C.c_int]
         self.C_run.argtypes = [C.POINTER(Ising), C.c_int]
+        self.C_run_v2.argtypes = [C.POINTER(Ising), C.c_int]
         self.C_run_until.argtypes = [C.POINTER(Ising), C.c_int, C.c_double]
+        self.C_run_until_v2.argtypes = [C.POINTER(Ising), C.c_int, C.c_double]
         self.C_run_sample.argtypes = [C.POINTER(Ising), C.POINTER(Sample)]
+        self.C_run_sample_v2.argtypes = [C.POINTER(Ising), C.POINTER(Sample)]
         self.C_pick_site.argtypes = [C.POINTER(Ising)]
         self.C_flip.argtypes = [C.POINTER(Ising), C.c_int]
-        self.C_find_neighbors.argtypes = [C.POINTER(Ising), C.c_int]
-        self.C_cost.argtypes = [C.POINTER(Ising), C.c_int]
+        self.C_flip_v2.argtypes = [C.POINTER(Ising), C.c_int]
+        self.C_first_neighbors.argtypes = [C.POINTER(Ising), C.c_int, C.c_int * 4]
+        self.C_second_neighbors.argtypes = [C.POINTER(Ising), C.c_int, C.c_int * 4]
+        self.C_cost.argtypes = [C.POINTER(Ising), C.c_int, C.c_int * 4]
         self.C_try_flip.argtypes = [C.POINTER(Ising), C.c_double]
         self.C_accept_flip.argtypes = [C.POINTER(Ising), C.c_int, C.c_int]
         self.C_calc_pi.argtypes = [C.POINTER(Ising), C.c_int, C.c_int]
-        self.C_calc_energy.argtypes = [C.POINTER(Ising), C.c_int]
+        self.C_calc_energy.argtypes = [C.POINTER(Ising), C.c_int, C.c_int]
         self.C_calc_magnet.argtypes = [C.POINTER(Ising), C.c_int]
         self.C_calc_lattice.argtypes = [C.POINTER(Ising)]
+        self.C_calc_lattice_v2.argtypes = [C.POINTER(Ising)]
 
         # Step size and first fill
         self.step_size = int(1.5 * n**2)
@@ -240,7 +262,7 @@ class Ising(C.Structure):
 
         # Init values and calc magnet and energy
         self.C_init(self, n)
-        self.C_calc_lattice(self)
+        self.calc_lattice()
 
     @property
     def T(self): return self._T
@@ -307,7 +329,10 @@ class Ising(C.Structure):
         self._p_lattice = self._lattice.ctypes.data_as(C.POINTER(C.c_int))
 
     def calc_lattice(self):
-        self.C_calc_lattice(self)
+        if self._v2:
+            self.C_calc_lattice_v2(self)
+        else:
+            self.C_calc_lattice(self)
 
     def fill_random(self, prob=0.5):
         random = np.ones(self._n**2)
@@ -318,26 +343,36 @@ class Ising(C.Structure):
     def run(self, step_size=None):
         if step_size is not None:
             self.step_size = step_size
-        nflips = self.C_run(self, self.step_size)
+        if self._v2:
+            nflips = self.C_run_v2(self, self.step_size)
+        else:
+            nflips = self.C_run(self, self.step_size)
         return nflips
 
     def run_until(self, step_size=None, tolerance=10.0):
         if step_size is not None:
             self.step_size = step_size
-        q = self.C_run_until(self, self.step_size, tolerance)
+        if self._v2:
+            q = self.C_run_until_v2(self, self.step_size, tolerance)
+        else:
+            q = self.C_run_until(self, self.step_size, tolerance)
         return q
 
     def run_sample(self, sample_size, step_size=None, tolerance=10.0):
         if step_size is not None:
             self.step_size = step_size
-        data = Sample(sample_size, self.step_size, tolerance)
-        self.C_run_sample(self, data)
+        if self._v2:
+            data = Sample(sample_size, self.step_size, tolerance, v2=True)
+            self.C_run_sample_v2(self, data)
+        else:
+            data = Sample(sample_size, self.step_size, tolerance)
+            self.C_run_sample(self, data)
         return data
 
 
 class State(Ising):
-    def __init__(self, n):
-        super().__init__(n)
+    def __init__(self, n, v2=False):
+        super().__init__(n, v2)
         self._fullname = None
 
     def save_as(self, fullname='', default='../data/states/state.npy'):
@@ -357,7 +392,8 @@ class State(Ising):
                   self._total_flips,
                   self._T,
                   self._J,
-                  self._B]
+                  self._B,
+                  self._v2]
 
         data = self._lattice
 
@@ -380,12 +416,13 @@ class State(Ising):
 
         params, data = np.load(fullname)
 
-        load_state = cls(n=int(params[0]))
+        load_state = cls(n=int(params[0]), v2=params[5])
         load_state._total_flips = int(params[1])
 
         load_state.T = float(params[2])
         load_state.J = float(params[3])
         load_state.B = float(params[4])
+        load_state._v2 = params[5]
 
         load_state._lattice = data
         pointer = load_state._lattice.ctypes.data_as(C.POINTER(C.c_int))
