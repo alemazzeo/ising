@@ -13,7 +13,7 @@ from analysis import Analysis, Result, Tools
 import numpy as np
 import matplotlib.pyplot as plt
 
-sim1 = Simulation.load('../data/simulations/TestSim0.npy')
+sim1 = Simulation.load('../data/simulations/Simulation0.npy')
 analysis = Analysis(sim1)
 
 

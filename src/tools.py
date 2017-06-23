@@ -226,7 +226,6 @@ class Tools():
 
     @classmethod
     def estimate_pdf(cls, data, plot=False, ax=None):
-        print(data)
         y, x = np.histogram(data, bins='auto', density=True)
         x = (x[1:] + x[:-1]) / 2
         f = gaussian_kde(data)
@@ -242,9 +241,12 @@ class Tools():
     def estimate_pdf_peaks(cls, data, widths=None, plot=False, ax=None):
         f, x, y = cls.estimate_pdf(data, plot=plot, ax=ax)
         y_pdf = f(x)
-
+        
         if widths is None:
-            widths = np.arange(10, int(len(x)/2))
+            if int(len(x)/2) > 15:
+                widths = np.arange(10, int(len(x)/2))
+            else:
+                widths = np.arange(10, 15)
         peakind = find_peaks_cwt(y_pdf, widths)
 
         if plot:
@@ -279,7 +281,9 @@ class Tools():
     @classmethod
     def plot_fit(cls, data, pdf_type, params, sigmas,
                  ax=None, hist=True, *args, **kwargs):
-
+        print('pdf_type', pdf_type)
+        print('params', params)
+        print('\n')
         if ax is None:
             plt.ion()
             fig, ax = plt.subplots(1)
@@ -293,7 +297,7 @@ class Tools():
                            params[3] * params[4])
             y2 = cls.gauss(x, -params[0], params[2],
                            params[3] * (1-params[4]))
-            y3 = y1 + y2
+            y3 = cls.bimodal_gauss(x, *params)
             ax.plot(x, y1, label='Positive')
             ax.plot(x, y2, label='Negative')
             ax.plot(x, y3, label='Bimodal')
@@ -315,24 +319,23 @@ class Tools():
 
             y1 = cls.expnorm(1-x, 1-params[0], params[1], params[3],
                              params[5] * params[6])
-            y2 = cls.expnorm(x+1, 1-params[0], params[2], params[4],
+            y2 = cls.expnorm(1+x, 1-params[0], params[2], params[4],
                              params[5] * (1-params[6]))
 
             ax.plot(x, y1, label='Positive')
             ax.plot(x, y2, label='Negative')
 
-            ax.legend(loc='best')
-
         elif pdf_type in ('ExponNorm Positive', 'ExponNorm Negative'):
             x = np.linspace(-1, 1, 200)
             if pdf_type == 'ExponNorm Negative':
-                y = cls.expnorm(1+x, params[0], params[1], params[2],
+                y = cls.expnorm(1+x, 1-params[0], params[1], params[2],
                                 params[3])
             else:
-                y = cls.expnorm(1-x, params[0], params[1], params[2],
+                y = cls.expnorm(1-x, 1-params[0], params[1], params[2],
                                 params[3])
             ax.plot(x, y, label=pdf_type)
-            ax.legend(loc='best')
+            
+        ax.legend(loc='best')
 
     @classmethod
     def classificate(cls, data, plot=False, ax=None):
@@ -409,23 +412,22 @@ class Tools():
         if pdf_type == 'Bimodal':
             # params: mu, sigma1, sigma2, A, dA
             par0 = [mu, 0.10, 0.10, A, 0.5]
-
             if -0.1 < mu < 0.1:
                 mins = [0, 0.01, 0.01, 0.0000, 0.45]
-                maxs = [1, 1.00, 1.00, np.inf, 0.55]
+                maxs = [1, 0.30, 0.30, np.inf, 0.55]
             elif -0.3 < mu < 0.3:
                 mins = [0, 0.01, 0.01, 0.0000, 0.35]
-                maxs = [1, 1.00, 1.00, np.inf, 0.65]
+                maxs = [1, 0.20, 0.20, np.inf, 0.65]
             elif -0.5 < mu < 0.5:
                 mins = [0, 0.01, 0.01, 0.0000, 0.20]
-                maxs = [1, 1.00, 1.00, np.inf, 0.80]
+                maxs = [1, 0.20, 0.20, np.inf, 0.80]
             else:
                 mins = [0, 0.01, 0.01, 0.0000, 0.00]
-                maxs = [1, 1.00, 1.00, np.inf, 1.00]
+                maxs = [1, 0.10, 0.10, np.inf, 1.00]
             bounds = (mins, maxs)
             params, cov = curve_fit(cls.bimodal_gauss, x, y,
                                     par0, bounds=bounds)
-
+            
         elif pdf_type == 'Positive':
             # params: mu, sigma, A
             par0 = [mu, 0.10,      A]
@@ -485,7 +487,11 @@ class Tools():
             # params: mu, sigma, lamb, A
 
             p0 = np.asarray(preparams)
-            p0[0] = 1+p0[0]
+            if pdf_type == 'Positive':
+                p0[0] = 1-p0[0]
+            else:
+                p0[0] = 1+p0[0]
+                
             pmax = p0 * 1.2
             pmin = p0 * 0.8
             p0 = p0.tolist()
@@ -510,6 +516,8 @@ class Tools():
             else:
                 params, cov = curve_fit(cls.expnorm, 1-x, y, par0,
                                         bounds=bounds)
+
+            params[0] = 1 - params[0]
 
         sigmas = np.sqrt(np.diag(cov))
 

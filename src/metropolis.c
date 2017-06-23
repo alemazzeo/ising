@@ -243,11 +243,13 @@ int flip(Ising *self, int idx)
     // Calcula pi
     pi = calc_pi(self, idx, aligned);
 
+//    printf("Aligned: %d, IDX: %d, pi: %f \n", aligned, idx, pi);
     // Intenta realizar el flip
     if (try_flip(self, pi))
     {
         // Acepta el flip. Actualiza E y M
         accept_flip(self, idx, aligned);
+//	printf("Flip \n");
         return 1;
     }
     else
@@ -337,10 +339,10 @@ int cost(Ising *self, int idx, int *neighbors)
     int aligned = 0;
     for(int i=0; i<4; i++)
     {
-	aligned += (self -> _p_lattice[neighbors[i]]);
+	aligned += ((self -> _p_lattice[neighbors[i]]) *
+		    (self -> _p_lattice[idx]));
     }
     aligned = aligned / 2 + 2;
-
     return aligned;
 }
 

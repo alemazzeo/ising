@@ -137,9 +137,8 @@ class Result():
 
     def fit(self, cls_ax=None, prefit_ax=None, fit_ax=None):
 
-        magnet = self.magnet_array/1024
+        magnet = self.magnet_array
         energy = self.energy_array
-        print(magnet)
 
         if cls_ax is not None:
             plot_cls = True

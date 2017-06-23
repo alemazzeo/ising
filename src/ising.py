@@ -70,7 +70,8 @@ class Sample(C.Structure):
                   self._T,
                   self._J,
                   self._B,
-                  self._v2]
+                  self._v2,
+                  self._n]
 
         data = [self._energy,
                 self._magnet,
@@ -80,6 +81,22 @@ class Sample(C.Structure):
 
         np.save(self._fullname, [params,data])
         return self._fullname
+
+    def append(self, sample):
+        assert isinstance(sample, Sample)
+        assert self._step_size == sample._step_size
+        assert self._tolerance == sample._tolerance
+        assert self._T == sample._T
+        assert self._J == sample._J
+        assert self._B == sample._B
+        assert self._v2 == sample._v2
+
+        self._sample_size += sample._sample_size
+        np.append(self._energy, sample._energy)
+        np.append(self._magnet, sample._magnet)
+        np.append(self._flips, sample._flips)
+        np.append(self._total_flips, sample._total_flips)
+        np.append(self._q, sample._q)
 
     @classmethod
     def load(cls, fullname, default='../data/samples/sample.npy'):
@@ -105,6 +122,7 @@ class Sample(C.Structure):
         load_sample._J = float(params[4])
         load_sample._B = float(params[5])
         load_sample._v2 = params[6]
+        load_sample._n = params[7]
 
         load_sample._energy = data[0]
         load_sample._magnet = data[1]
@@ -266,19 +284,19 @@ class Ising(C.Structure):
 
     @property
     def T(self): return self._T
-    
+
     @T.setter
     def T(self, value): self._set(T=value)
 
     @property
     def J(self): return self._J
-    
+
     @J.setter
     def J(self, value): self._set(J=value)
 
     @property
     def B(self): return self._B
-    
+
     @B.setter
     def B(self, value): self._set(B=value)
 
@@ -436,14 +454,14 @@ class State(Ising):
         curve, ax, fig = Tools.plot_lattice(self._lattice, ax=ax, **kwargs)
         return curve, ax, fig
 
-    
+
 class Simulation():
-    def __init__(self, state):
+    def __init__(self, state, v2=False):
 
         if isinstance(state, State):
             self._state = state
         elif isinstance(state, int):
-            self._state = State(state)
+            self._state = State(state, v2)
 
         self._state.fill_random()
 
@@ -479,7 +497,8 @@ class Simulation():
         self._state.run_until(therm)
 
     def sweep(self, T=None, sweep_step='auto', sample_size=100,
-              ising_step='auto', therm='auto', J=None, B=None):
+              ising_step='auto', therm='auto', J=None, B=None,
+              tolerance=10.0):
 
         if therm == 'auto':
             therm = self._state._n2 * 50
@@ -509,13 +528,14 @@ class Simulation():
             raise ValueError
 
         if sweep_step is 'auto':
-            sweep_step = 0.1
-
+            if start > end:
+                sweep_step = -0.1
+            else:
+                sweep_step = +0.1
+                
         values = np.arange(start, end, sweep_step)
         n = float(len(values))
         m = 50
-        temp_samples = '../data/simulations/temp/samples/sample.npy'
-        temp_states = '../data/simulations/temp/states/state.npy'
 
         for i, value in np.ndenumerate(values):
             j = int(m*(i[0]+1)/n)
@@ -526,20 +546,75 @@ class Simulation():
             set_value(value)
             self._state.run_until(therm)
 
-            # Fill a sample
-            sample = self._state.run_sample(sample_size, ising_step)
-
-            sample_name = sample.save_as(temp_samples)
-            state_name = self._state.save_as(temp_states)
-
-            self._params.append([self._state.T,
-                                 self._state.J,
-                                 self._state.B])
-
-            self._sample_names.append(sample_name)
-            self._state_names.append(state_name)
+            self.add_sample(sample_size, ising_step, tolerance)
 
         print('Sweep completed.' + ' ' * (m+len(parameter)))
+
+    def add_sample(self, sample_size, ising_step, tolerance=10.0):
+        temp_samples = '../data/simulations/temp/samples/sample.npy'
+        temp_states = '../data/simulations/temp/states/state.npy'
+
+        sample = self._state.run_sample(sample_size, ising_step)
+
+        sample_name = sample.save_as(temp_samples)
+        state_name = self._state.save_as(temp_states)
+
+        self._params.append([self._state.T,
+                             self._state.J,
+                             self._state.B])
+
+        self._sample_names.append(sample_name)
+        self._state_names.append(state_name)
+
+
+    def _expand_sample(self, sample_name, state_name, add_size):
+        sample = Sample.load(sample_name)
+        state = State.load(state_name)
+
+        ising_step = sample._step_size
+        tolerance = sample._tolerance
+
+        new_sample = state.run_sample(add_size, ising_step, tolerance)
+        sample.append(new_sample)
+        sample.save()
+        state.save()
+
+    def expand(self, index, add_size=100):
+        if isinstance(index, int):
+            sample_name, state_name = self[index]
+            self._expand_sample(sample_name, state_name, add_size)
+        elif isinstance(index, slice):
+            samples_name, states_name = self[index]
+            for i in range(len(samples_name)):
+                self._expand_sample(samples_name[i], states_name[i], add_size)
+        else:
+            raise ValueError
+
+    def view(self):
+        plt.ion()
+        fig, ax = plt.subplots(4)
+        T = list()
+        B = list()
+        J = list()
+        N = list()
+
+        for name in self._sample_names:
+            sample = Sample.load(name)
+            T.append(sample._T)
+            B.append(sample._B)
+            J.append(sample._J)
+            N.append(sample._sample_size)
+
+        x = np.arange(len(T))
+
+        ax[0].plot(x, T, 'o', label='Temperature (T)')
+        ax[1].plot(x, B, 'o', label='Interaction (J)')
+        ax[2].plot(x, J, 'o', label='Extern Field (B)')
+        ax[3].bar(x, N, label='Samples (N)')
+        ax[0].legend(loc='best')
+        ax[1].legend(loc='best')
+        ax[2].legend(loc='best')
+        ax[3].legend(loc='best')
 
     def save_as(self, fullname, default='../data/simulations/sim.npy',
                 verbose=False):

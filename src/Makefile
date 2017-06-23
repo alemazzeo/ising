@@ -33,7 +33,7 @@ library: $(LIBRARY)
 all: objects executable library
 
 $(BIN)%_c.o: %.c
-	$(CC) $(CFLAGS) -c -fPIC $^ -o $@
+	$(CC) $(CFLAGS) -g -c -fPIC $^ -o $@
 
 %.e: $(OBJECTS_C)
 	$(LD) $^ $(LDFLAGS) -o $@
