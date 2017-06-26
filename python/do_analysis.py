@@ -13,7 +13,15 @@ from analysis import Analysis, Result, Tools
 import numpy as np
 import matplotlib.pyplot as plt
 
-sim1 = Simulation.load('../data/simulations/Simulation5.npy')
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-sim', type=str,
+                    default='Simulation2')
+
+params = parser.parse_args()
+
+sim1 = Simulation.load(params.sim)
 analysis = Analysis(sim1)
 
 

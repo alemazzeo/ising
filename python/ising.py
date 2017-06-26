@@ -530,9 +530,14 @@ class Simulation():
 
         if sweep_step is 'auto':
             if start > end:
-                sweep_step = -0.1
+                sweep_step = 0.1
             else:
-                sweep_step = +0.1
+                sweep_step = 0.1
+
+        if start > end:
+            sweep_step = -abs(sweep_step)
+        else:
+            sweep_step = abs(sweep_step)
                 
         values = np.arange(start, end, sweep_step)
         n = float(len(values))
@@ -694,6 +699,13 @@ class Simulation():
         path, name, extension = Tools.splitname(fullname)
         dpath, dname, dextension = Tools.splitname(default)
 
+        if path == '':
+            path = dpath
+        if name == '':
+            name = dname
+        if extension == '':
+            extension = dextension
+        
         fullname = path + '/' + name + extension
 
         params, sample_names, state_names = np.load(fullname)
