@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 
 from tools import Tools
 
-
 class Sample(C.Structure):
     _fields_ = [("_n", C.c_int),
                 ("_sample_size", C.c_int),
@@ -148,11 +147,14 @@ class Sample(C.Structure):
     @property
     def q(self): return self._q
 
-    def __repr__(self): return self._fullname
-    def __str__(self): return self._fullname + '\n' + self._print_params()
+    def __repr__(self):
+        return self._print_params()
+
+    def __str__(self):
+        return self._print_params()
 
     def _print_params(self):
-        return 'T=%.4f\nJ=%.4f\nB=%.4f'% (self._T, self._J, self._B)
+        return 'T=%.4f\nJ=%.4f\nB=%.4f' % (self._T, self._J, self._B)
 
     def view_energy(self, ax=None, **kwargs):
         Tools.plot_hist(self.energy, ax=ax, **kwargs)
@@ -193,7 +195,7 @@ class Ising(C.Structure):
         self._v2 = v2
 
         # C Library
-        self._lib = C.CDLL('./libising.so')
+        self._lib = C.CDLL('../bin/libising.so')
 
         # Functions
         self.C_init = self._lib.init
@@ -387,7 +389,6 @@ class Ising(C.Structure):
             self.C_run_sample(self, data)
         return data
 
-
 class State(Ising):
     def __init__(self, n, v2=False):
         super().__init__(n, v2)
@@ -566,7 +567,6 @@ class Simulation():
         self._sample_names.append(sample_name)
         self._state_names.append(state_name)
 
-
     def _expand_sample(self, sample_name, state_name, add_size):
         sample = Sample.load(sample_name)
         state = State.load(state_name)
@@ -579,11 +579,13 @@ class Simulation():
         sample.save()
         state.save()
 
-    def expand(self, index, add_size=100):
+    def expand(self, index=None, add_size=10000):
         if isinstance(index, int):
             sample_name, state_name = self[index]
             self._expand_sample(sample_name, state_name, add_size)
-        elif isinstance(index, slice):
+        elif isinstance(index, slice) or index is None:
+            if index is None:
+                index = slice(None, None, None)
             samples_name, states_name = self[index]
             for i in range(len(samples_name)):
                 self._expand_sample(samples_name[i], states_name[i], add_size)
@@ -704,3 +706,5 @@ class Simulation():
         simulation._fullname = fullname
 
         return simulation
+
+

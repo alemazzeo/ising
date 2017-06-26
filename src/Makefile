@@ -10,7 +10,7 @@ OBJECTS_C = $(patsubst %.c, $(BIN)%_c.o, $(SOURCE_C))
 
 CFLAGS = -std=gnu99 -Wall -fPIC
 EXECUTABLE = ../bin/ising.e
-LIBRARY = libising.so
+LIBRARY = ../bin/libising.so
 LDFLAGS = -lm
 
 default: help

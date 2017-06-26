@@ -411,10 +411,10 @@ class Tools():
 
         if pdf_type == 'Bimodal':
             # params: mu, sigma1, sigma2, A, dA
-            par0 = [mu, 0.10, 0.10, A, 0.5]
+            par0 = [mu, 0.02, 0.02, A, 0.5]
             if -0.1 < mu < 0.1:
                 mins = [0, 0.01, 0.01, 0.0000, 0.45]
-                maxs = [1, 0.30, 0.30, np.inf, 0.55]
+                maxs = [1, 0.05, 0.05, np.inf, 0.55]
             elif -0.3 < mu < 0.3:
                 mins = [0, 0.01, 0.01, 0.0000, 0.35]
                 maxs = [1, 0.20, 0.20, np.inf, 0.65]
