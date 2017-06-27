@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt
 from ising import Sample, State, Simulation
 from tools import Tools
 
+class FitError(Exception):
+    """Exception for error during fit process"""
 
 class Analysis():
 
@@ -39,6 +41,20 @@ class Analysis():
         self._figs = list()
         self._axs = list()
         self._funcs = list()
+
+    def fit_all(self, refit=False):
+        ommited = 0
+        for i, result in enumerate(self._results):
+            if (not result.fitted) or refit:
+                try:
+                    result.fit()
+                except FitError:
+                    ommited += 1
+            print('Fitting %d of %d' % (i, len(self._results)) +
+                  ' ' * 10, end='\r')
+        print('Done.' + ' ' * 40)
+        if ommited > 0:
+            print('%d was ommited' % ommited)
 
     def __len__(self): return len(self._results)
 
@@ -78,6 +94,50 @@ class Analysis():
     @property
     def current(self): return self._current
 
+    @property
+    def energy(self):
+        energy = list()
+        sd = list()
+        for result in self._results:
+            if result.fitted:
+                energy.append(result.energy[0])
+                sd.append(result.energy[1])
+
+        return np.asarray(energy), np.asarray(sd)
+
+    @property
+    def magnet(self):
+        m_pos, sd_pos, a_pos = [], [], []
+        m_neg, sd_neg, a_neg = [], [], []
+        for i, result in enumerate(self._results):
+            if result.fitted:
+                m_pos.append(result.magnet[0][0])
+                sd_pos.append(result.magnet[0][1])
+                a_pos.append(result.magnet[0][2])
+                m_neg.append(result.magnet[1][0])
+                sd_neg.append(result.magnet[1][1])
+                a_neg.append(result.magnet[1][2])
+
+        m_pos = np.asarray(m_pos)
+        sd_pos = np.asarray(sd_pos)
+        a_pos = np.asarray(a_pos)
+        m_neg = np.asarray(m_neg)
+        sd_neg = np.asarray(sd_neg)
+        a_neg = np.asarray(a_neg)
+                                                
+        return m_pos, sd_pos, a_pos, m_neg, sd_neg, a_neg
+
+    @property
+    def params(self):
+        Ts, Js, Bs = [], [], []
+        for result in self._results:
+            if result.fitted:
+                Ts.append(result.T)
+                Js.append(result.J)
+                Bs.append(result.B)
+            
+        return np.asarray(Ts), np.asarray(Js), np.asarray(Bs)
+
     @current.setter
     def current(self, value):
         assert 0 < value < self._n
@@ -92,12 +152,39 @@ class Analysis():
         if self._current - n > 0:
             self.current -= n
 
+    def plot_magnet(self, ax=None):
+        if ax is None:
+            plt.ion()
+            fig, ax = plt.subplots(1)
+        T, J, B = self.params
+        mu_energy, sd_energy = self.energy
+        mu_m1, sd_m1, a_m1, mu_m2, sd_m2, a_m2 = self.magnet
+        for i in range(len(T)):
+            if a_m1[i] > 0:
+                ax.errorbar(T[i], mu_m1[i], yerr=sd_m1[i]/2,
+                            color='b', marker='o', markersize=a_m1[i]*10)
+            if a_m2[i] > 0:
+                ax.errorbar(T[i], mu_m2[i], yerr=sd_m2[i]/2,
+                            color='r', marker='o', markersize=a_m2[i]*10)
+
 
 class Result():
     def __init__(self, sample_name, autofit=False):
         self._sample_name = sample_name
         path, name, extension = Tools.splitname(self._sample_name)
         self._fullname = path + '/' + name + '_r' + extension
+
+        self._fitted = False
+
+        sample = Sample.load(self._sample_name)
+        self._magnet_array = sample.magnet
+        self._energy_array = sample.energy
+        self._T = sample._T
+        self._J = sample._J
+        self._B = sample._B
+        self._sample_size = sample._sample_size
+        self._ising_step = sample._step_size
+        self._tolerance = sample._tolerance
         
         if Tools.file_exist(self._fullname):
             data = np.load(self._fullname)
@@ -106,7 +193,7 @@ class Result():
             self._fit_params = data[2]
             self._energy = data[3]
             self._magnet = data[4]
-            print('Loaded')
+            self._fitted = True
         else:
             if autofit:
                 self.fit()
@@ -119,13 +206,35 @@ class Result():
 
     @property
     def magnet_array(self):
-        sample = Sample.load(self._sample_name)
-        return sample.magnet
+        return self._magnet_array
 
     @property
     def energy_array(self):
-        sample = Sample.load(self._sample_name)
-        return sample.energy
+        return self._energy_array
+
+    @property
+    def T(self):
+        return self._T
+
+    @property
+    def J(self):
+        return self._J
+
+    @property
+    def B(self):
+        return self._B
+
+    @property
+    def sample_size(self):
+        return self._sample_size
+
+    @property
+    def ising_step(self):
+        return self._ising_step
+
+    @property
+    def tolerance(self):
+        return self._tolerance
 
     @property
     def energy(self):
@@ -135,35 +244,41 @@ class Result():
     def magnet(self):
         return self._magnet
 
+    @property
+    def fitted(self):
+        return self._fitted
+
     def fit(self, cls_ax=None, prefit_ax=None, fit_ax=None):
+        try:
+            magnet = self.magnet_array
+            energy = self.energy_array
 
-        magnet = self.magnet_array
-        energy = self.energy_array
+            if cls_ax is not None:
+                plot_cls = True
+            else:
+                plot_cls = False
 
-        if cls_ax is not None:
-            plot_cls = True
-        else:
-            plot_cls = False
-            
-        cls_params = Tools.classificate(magnet, plot=plot_cls, ax=cls_ax)
+            cls_params = Tools.classificate(magnet, plot=plot_cls, ax=cls_ax)
 
-        pre_params = Tools.prefit(magnet, *cls_params)
-        if prefit_ax is not None:
-            Tools.plot_fit(magnet, *pre_params, ax=prefit_ax)
+            pre_params = Tools.prefit(magnet, *cls_params)
+            if prefit_ax is not None:
+                Tools.plot_fit(magnet, *pre_params, ax=prefit_ax)
 
-        fit_params = Tools.fit(magnet, *pre_params)
-        if fit_ax is not None:
-            Tools.plot_fit(magnet, *fit_params, ax=fit_ax)
+            fit_params = Tools.fit(magnet, *pre_params)
+            if fit_ax is not None:
+                Tools.plot_fit(magnet, *fit_params, ax=fit_ax)
 
-        self._cls_params = cls_params
-        self._pre_params = pre_params
-        self._fit_params = fit_params
+            self._cls_params = cls_params
+            self._pre_params = pre_params
+            self._fit_params = fit_params
 
-        self._energy = [np.mean(energy), np.var(energy)**0.5]
-        self._magnet = Tools.interpret(*fit_params)
+            self._energy = [np.mean(energy), np.var(energy)**0.5]
+            self._magnet = Tools.interpret(*fit_params)
 
-        self._save()
-        print('Fitted')
+            self._save()
+            self._fitted = True
+        except:
+            raise FitError
 
     def _save(self):
         data = [self._cls_params,

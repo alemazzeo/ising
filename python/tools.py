@@ -256,9 +256,9 @@ class Tools():
         
         if widths is None:
             if int(len(x)/2) > 15:
-                widths = np.arange(10, int(len(x)/2))
+                widths = np.arange(5, int(len(x)/2))
             else:
-                widths = np.arange(10, 15)
+                widths = np.arange(5, 15)
         peakind = find_peaks_cwt(y_pdf, widths)
 
         if plot:
@@ -432,13 +432,13 @@ class Tools():
             par0 = [mu, 0.05, 0.5, A, 0.5]
             if -0.1 < mu < 0.1:
                 mins = [0, 0.01, 0.45, 0.0000, 0.45]
-                maxs = [1, 0.20, 0.55, np.inf, 0.55]
+                maxs = [1, 0.80, 0.55, np.inf, 0.55]
             elif -0.3 < mu < 0.3:
                 mins = [0, 0.01, 0.35, 0.0000, 0.35]
-                maxs = [1, 0.20, 0.65, np.inf, 0.65]
+                maxs = [1, 0.60, 0.65, np.inf, 0.65]
             elif -0.5 < mu < 0.5:
                 mins = [0, 0.01, 0.20, 0.0000, 0.20]
-                maxs = [1, 0.20, 0.80, np.inf, 0.80]
+                maxs = [1, 0.30, 0.80, np.inf, 0.80]
             else:
                 mins = [0, 0.01, 0.00, 0.0000, 0.00]
                 maxs = [1, 0.20, 1.00, np.inf, 1.00]
@@ -549,27 +549,29 @@ class Tools():
             mean2 = mu + 1/lamb2
             sd1 = np.sqrt(sigma*ds + (1/lamb1**2))
             sd2 = np.sqrt(sigma*(1-ds) + (1/lamb2**2))
-            return [mean1, -mean2], [sd1, sd2], [dA, 1-dA]
+            return [mean1, sd1, dA], [-mean2, sd2, 1-dA]
 
         elif pdf_type in ('ExponNorm Positive', 'ExponNorm Negative'):
             mu, sigma, lamb, A = params
             mean = abs(mu) + 1/lamb
             sd = np.sqrt(sigma + (1/lamb**2))
             if pdf_type == 'ExponNorm Positive':
-                return [0.0, +mean], [1.0, sd], [0.0, 1.0]
+                return [+mean, sd, 1.0], [0.0, 1.0, 0.0]
             else:
-                return [-mean, 0.0], [sd, 1.0], [1.0, 0.0]
+                return [0.0, 1.0, 0.0], [-mean, sd, 1.0]
 
         elif pdf_type == 'Norm Bimodal':
             mu, sigma, ds, A, dA = params
-            return [mu, -mu], [sigma*ds, sigma*(1-ds)], [dA, 1-dA]
+            return [mu, sigma*ds, A*dA], [-mu, sigma*(1-ds), A*(1-dA)]
         elif pdf_type in ('Norm Positive', 'Norm Negative'):
             mu, sigma, A = params
             mean = abs(mu)
             sd = np.sqrt(sigma)
             if pdf_type == 'Norm Positive':
-                return [0.0, +mean], [0.0, sd], [0.0, 1.0]
+                return [mean, sd, 1.0], [0.0, 1.0, 0.0]
             else:
-                return [-mean, 0.0], [sd, 0.0], [1.0, 0.0]
+                return [0.0, 1.0, 0.0], [-mean, sd, 1.0] 
         else:
             raise ValueError
+
+    

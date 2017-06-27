@@ -369,7 +369,7 @@ class Ising(C.Structure):
             nflips = self.C_run(self, self.step_size)
         return nflips
 
-    def run_until(self, step_size=None, tolerance=10.0):
+    def run_until(self, step_size=None, tolerance=1.0):
         if step_size is not None:
             self.step_size = step_size
         if self._v2:
@@ -378,7 +378,7 @@ class Ising(C.Structure):
             q = self.C_run_until(self, self.step_size, tolerance)
         return q
 
-    def run_sample(self, sample_size, step_size=None, tolerance=10.0):
+    def run_sample(self, sample_size, step_size=None, tolerance=1.0):
         if step_size is not None:
             self.step_size = step_size
         if self._v2:
