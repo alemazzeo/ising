@@ -163,10 +163,10 @@ class Analysis():
         mu_m1, sd_m1, a_m1, mu_m2, sd_m2, a_m2 = self.magnet
         for i in range(len(T)):
             if a_m1[i] > 0:
-                ax.errorbar(T[i], mu_m1[i], yerr=sd_m1[i] / 2,
+                ax.errorbar(T[i], mu_m1[i], yerr=sd_m1[i] / 8,
                             color='b', marker='o', markersize=a_m1[i] * 10)
             if a_m2[i] > 0:
-                ax.errorbar(T[i], mu_m2[i], yerr=sd_m2[i] / 2,
+                ax.errorbar(T[i], mu_m2[i], yerr=sd_m2[i] / 8,
                             color='r', marker='o', markersize=a_m2[i] * 10)
 
 

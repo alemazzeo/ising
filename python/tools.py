@@ -327,6 +327,11 @@ class Tools():
             y = cls.gauss(x, *params)
             ax.plot(x, y, label=pdf_type)
 
+        elif pdf_type == 'Norm Center':
+            x = np.linspace(-1, 1, 200)
+            y = cls.gauss(x, *params)
+            ax.plot(x, y, label=pdf_type)
+
         elif pdf_type == 'ExponNorm Bimodal':
             x = np.linspace(-1, 1, 200)
             y = cls.bimodal_expnorm(x, *params)
@@ -382,12 +387,12 @@ class Tools():
             return 'Bimodal', mu, A
 
         elif n == 1:
-            if xpeaks[0] > 0.5:
+            if xpeaks[0] > 0.8:
                 mu = xpeaks[0]
                 A = ypeaks[0]
                 return 'Positive', mu, A
 
-            elif xpeaks[0] < -0.5:
+            elif xpeaks[0] < -0.8:
                 mu = xpeaks[0]
                 A = ypeaks[0]
                 return 'Negative', mu, A
@@ -478,44 +483,56 @@ class Tools():
         _, pdf_type = pdf_type.split(' ')
 
         if pdf_type == 'Bimodal':
-            # params: mu, sigma1, sigma2, lamb1, lamb2, A, dA
             p0 = np.asarray(preparams)
-            pmax = p0 * 1.3
-            pmin = p0 * 0.7
-            p0 = p0.tolist()
-            pmax = pmax.tolist()
-            pmin = pmin.tolist()
 
-            mu__, s__, ds__, A__, dA__ = pmin
-            _mu_, _s_, _ds_, _A_, _dA_ = p0
-            __mu, __s, __ds, __A, __dA = pmax
-
-            if(mu__ < 0):
-                mu__ = 0
-            if(__mu > 1):
-                __mu = 1
-
-            if -0.1 < _mu_ < 0.1:
-                mu__, _mu_, __mu = 0.0, 0.0, 0.10
-                l__, _l_, __l = 2.0, 40.0, 160.0
-                dl__, _dl_, __dl = 0.45, 0.50, 0.55
-            elif -0.3 < _mu_ < 0.3:
-                l__, _l_, __l = 2.0, 40.0, 160.0
-                dl__, _dl_, __dl = 0.40, 0.50, 0.60
-            elif -0.5 < _mu_ < 0.5:
-                l__, _l_, __l = 2.0, 40.0, 160.0
-                dl__, _dl_, __dl = 0.35, 0.50, 0.65
+            print('SEPARATION: ', p0[0] / p0[1])
+            if p0[0] / p0[1] < 0.5:
+                mu = p0[0]
+                sigma = p0[1]
+                A = p0[3]
+                par0 = [mu, sigma, A]
+                mins = [0, 0.01, 0.0]
+                maxs = [1, 0.50, np.inf]
+                bounds = (mins, maxs)
+                params, cov = curve_fit(cls.gauss, x, y, par0, bounds=bounds)
+                pdf_type = 'Norm Center'
             else:
-                l__, _l_, __l = 2.0, 40.0, 160.0
-                dl__, _dl_, __dl = 0.20, 0.5, 0.80
+                pmax = p0 * 1.3
+                pmin = p0 * 0.7
+                p0 = p0.tolist()
+                pmax = pmax.tolist()
+                pmin = pmin.tolist()
 
-            mins = [mu__, s__, ds__, l__, dl__, A__, dA__]
-            par0 = [_mu_, _s_, _ds_, _l_, _dl_, _A_, _dA_]
-            maxs = [__mu, __s, __ds, __l, __dl, __A, __dA]
-            bounds = (mins, maxs)
-            params, cov = curve_fit(cls.bimodal_expnorm, x, y, par0,
-                                    bounds=bounds)
+                mu__, s__, ds__, A__, dA__ = pmin
+                _mu_, _s_, _ds_, _A_, _dA_ = p0
+                __mu, __s, __ds, __A, __dA = pmax
 
+                if(mu__ < 0):
+                    mu__ = 0
+                if(__mu > 1):
+                    __mu = 1
+
+                if -0.1 < _mu_ < 0.1:
+                    mu__, _mu_, __mu = 0.0, 0.0, 0.10
+                    l__, _l_, __l = 2.0, 40.0, 160.0
+                    dl__, _dl_, __dl = 0.45, 0.50, 0.55
+                elif -0.3 < _mu_ < 0.3:
+                    l__, _l_, __l = 2.0, 40.0, 160.0
+                    dl__, _dl_, __dl = 0.40, 0.50, 0.60
+                elif -0.5 < _mu_ < 0.5:
+                    l__, _l_, __l = 2.0, 40.0, 160.0
+                    dl__, _dl_, __dl = 0.35, 0.50, 0.65
+                else:
+                    l__, _l_, __l = 2.0, 40.0, 160.0
+                    dl__, _dl_, __dl = 0.20, 0.5, 0.80
+
+                mins = [mu__, s__, ds__, l__, dl__, A__, dA__]
+                par0 = [_mu_, _s_, _ds_, _l_, _dl_, _A_, _dA_]
+                maxs = [__mu, __s, __ds, __l, __dl, __A, __dA]
+                bounds = (mins, maxs)
+                params, cov = curve_fit(cls.bimodal_expnorm, x, y, par0,
+                                        bounds=bounds)
+                pdf_type = 'ExponNorm Bimodal'
         elif pdf_type in ('Positive', 'Negative'):
             # params: mu, sigma, lamb, A
 
@@ -551,10 +568,11 @@ class Tools():
                                         bounds=bounds)
 
             params[0] = 1 - params[0]
+            pdf_type = 'ExponNorm ' + pdf_type
 
         sigmas = np.sqrt(np.diag(cov))
 
-        return 'ExponNorm ' + pdf_type, params, sigmas
+        return pdf_type, params, sigmas
 
     @classmethod
     def interpret(cls, pdf_type, params, sigmas):
@@ -593,14 +611,20 @@ class Tools():
 
         elif pdf_type == 'Norm Bimodal':
             mu, sigma, ds, A, dA = params
-            return [mu, sigma * ds, A * dA], [-mu, sigma * (1 - ds), A * (1 - dA)]
-        elif pdf_type in ('Norm Positive', 'Norm Negative'):
+            sigma1 = sigma * ds
+            sigma2 = sigma * (1 - ds)
+            A1 = A * dA
+            A2 = A * (1 - dA)
+            return [mu, sigma1, A1], [-mu, sigma2, A2]
+        elif pdf_type in ('Norm Positive', 'Norm Negative', 'Norm Center'):
             mu, sigma, A = params
             mean = abs(mu)
             sd = np.sqrt(sigma)
             if pdf_type == 'Norm Positive':
                 return [mean, sd, 1.0], [0.0, 1.0, 0.0]
-            else:
+            elif pdf_type == 'Norm Negative':
                 return [0.0, 1.0, 0.0], [-mean, sd, 1.0]
+            else:
+                return [mean, sd, 1.0], [-mean, sd, 1.0]
         else:
             raise ValueError
