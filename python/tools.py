@@ -26,7 +26,7 @@ class Tools():
         name0 = fullname + extension
         name1 = default_path + name
         name2 = default_path + name + extension
-        
+
         if os.path.isfile(fullname):
             return fullname
         elif os.path.isfile(name0):
@@ -35,7 +35,7 @@ class Tools():
             return name1
         elif os.path.isfile(name2):
             return name2
-    
+
     @classmethod
     def splitname(cls, fullname):
         fullname, extension = os.path.splitext(fullname)
@@ -58,10 +58,10 @@ class Tools():
         if name == '':
             name = dname
 
-        if os.path.isfile(path+'/'+name+'0'+extension):
+        if os.path.isfile(path + '/' + name + '0' + extension):
             i = 0
             newname = name + str(i)
-            while os.path.isfile(path+'/'+newname+extension):
+            while os.path.isfile(path + '/' + newname + extension):
                 i += 1
                 newname = name + str(i)
             name = newname
@@ -73,7 +73,7 @@ class Tools():
     @classmethod
     def lastname(cls, fullname, default='../data/temp.npy'):
         path, name, extension = cls.splitname(cls.newname(fullname, default))
-        return path + '/' + name[:-1] + str(int(name[-1])-1) + extension
+        return path + '/' + name[:-1] + str(int(name[-1]) - 1) + extension
 
     @classmethod
     def move(cls, files, dest, copy=False, verbose=False):
@@ -83,7 +83,7 @@ class Tools():
             path, name, extension = cls.splitname(fullname)
             dpath, dname, dextension = cls.splitname(dest)
 
-            if (path==dpath and name[:len(dname)]==dname):
+            if (path == dpath and name[:len(dname)] == dname):
                 newlist.append(fullname)
             else:
                 newname = cls.newname(dest)
@@ -154,13 +154,13 @@ class Tools():
             plt.ion()
             fig, ax = plt.subplots(2)
 
-        x = data[0:int(n/100)]
+        x = data[0:int(n / 100)]
         acorr = cls.autocorrelation(x)
         curve_d = cls.plot_step(x, ax=ax[0], **plot1_kw)
         curve_a = cls.plot_step(acorr, ax=ax[1], **plot2_kw)
 
         for i in range(99):
-            x = data[0:int(n*(i+2)/100)]
+            x = data[0:int(n * (i + 2) / 100)]
             acorr = cls.autocorrelation(x)
             curve_d.set_data(np.arange(x.size), x)
             curve_a.set_data(np.arange(acorr.size), acorr)
@@ -175,11 +175,11 @@ class Tools():
 
     @classmethod
     def autocorrelation(cls, x):
-        xp = x-np.mean(x)
+        xp = x - np.mean(x)
         f = np.fft.fft(xp)
-        p = np.array([np.real(v)**2+np.imag(v)**2 for v in f])
+        p = np.array([np.real(v)**2 + np.imag(v)**2 for v in f])
         pi = np.fft.ifft(p)
-        return np.real(pi)[:int(x.size/2)]/np.sum(xp**2)
+        return np.real(pi)[:int(x.size / 2)] / np.sum(xp**2)
 
     @classmethod
     def autocorrelation2(cls, x):
@@ -187,8 +187,8 @@ class Tools():
         var = np.var(x)
         acorr = np.zeros(n, dtype=float)
         for k in range(n):
-            acorr[k] = np.sum((x[0:n-k]-np.mean(x[0:n-k]))
-                              *(x[k:n]-np.mean(x[k:n]))) / (n*var)
+            acorr[k] = np.sum((x[0:n - k] - np.mean(x[0:n - k]))
+                              * (x[k:n] - np.mean(x[k:n]))) / (n * var)
         return acorr
 
     @classmethod
@@ -234,7 +234,6 @@ class Tools():
 
         curve, = ax.plot(x, curve(x, *c_params), **params)
         return curve
-    
 
     @classmethod
     def estimate_pdf(cls, data, plot=False, ax=None):
@@ -253,10 +252,10 @@ class Tools():
     def estimate_pdf_peaks(cls, data, widths=None, plot=False, ax=None):
         f, x, y = cls.estimate_pdf(data, plot=plot, ax=ax)
         y_pdf = f(x)
-        
+
         if widths is None:
-            if int(len(x)/2) > 15:
-                widths = np.arange(5, int(len(x)/2))
+            if int(len(x) / 2) > 15:
+                widths = np.arange(5, int(len(x) / 2))
             else:
                 widths = np.arange(5, 15)
         peakind = find_peaks_cwt(y_pdf, widths)
@@ -278,17 +277,19 @@ class Tools():
 
     @classmethod
     def bimodal_gauss(cls, x, mu, sigma, ds, A, dA):
-        return (cls.gauss(x, mu, sigma*ds, A*dA) +
-                cls.gauss(x, -mu, sigma*(1-ds), A*(1-dA)))
+        return (cls.gauss(x, mu, sigma * ds, A * dA) +
+                cls.gauss(x, -mu, sigma * (1 - ds), A * (1 - dA)))
 
     @classmethod
     def expnorm(cls, x, mu, sigma, lamb, A):
-        return A * exponnorm.pdf(x, 1/(lamb*sigma), loc=mu, scale=sigma)
+        return A * exponnorm.pdf(x, 1 / (lamb * sigma), loc=mu, scale=sigma)
 
     @classmethod
-    def bimodal_expnorm(cls, x, mu, sigma, ds, lamb1, lamb2, A, dA):
-        return (cls.expnorm(1-x, 1-mu, sigma*ds, lamb1, A*dA) +
-                cls.expnorm(x+1, 1-mu, sigma*(1-ds), lamb2, A*(1-dA)))
+    def bimodal_expnorm(cls, x, mu, sigma, ds, lamb, dl, A, dA):
+        return (cls.expnorm(1 - x, 1 - mu, sigma * ds,
+                            lamb * dl, A * dA) +
+                cls.expnorm(x + 1, 1 - mu, sigma * (1 - ds),
+                            lamb * (1 - dl), A * (1 - dA)))
 
     @classmethod
     def plot_fit(cls, data, pdf_type, params, sigmas,
@@ -306,16 +307,16 @@ class Tools():
         if pdf_type == 'Norm Bimodal':
             x = np.linspace(-1, 1, 200)
             y1 = cls.gauss(x, params[0],
-                           params[1]*params[2],
-                           params[3]*params[4])
+                           params[1] * params[2],
+                           params[3] * params[4])
             y2 = cls.gauss(x, -params[0],
-                           params[1]*(1-params[2]),
-                           params[3]*(1-params[4]))
+                           params[1] * (1 - params[2]),
+                           params[3] * (1 - params[4]))
             y3 = cls.bimodal_gauss(x, *params)
             ax.plot(x, y1, label='Positive')
             ax.plot(x, y2, label='Negative')
             ax.plot(x, y3, label='Bimodal')
-            
+
         elif pdf_type == 'Norm Positive':
             x = np.linspace(-1, 1, 200)
             y = cls.gauss(x, *params)
@@ -331,14 +332,14 @@ class Tools():
             y = cls.bimodal_expnorm(x, *params)
             ax.plot(x, y, label='Bimodal')
 
-            y1 = cls.expnorm(1-x, 1-params[0],
-                             params[1]*params[2],
-                             params[3],
-                             params[5]*params[6])
-            y2 = cls.expnorm(1+x, 1-params[0],
-                             params[1]*(1-params[2]),
-                             params[4],
-                             params[5]*(1-params[6]))
+            y1 = cls.expnorm(1 - x, 1 - params[0],
+                             params[1] * params[2],
+                             params[3] * params[4],
+                             params[5] * params[6])
+            y2 = cls.expnorm(1 + x, 1 - params[0],
+                             params[1] * (1 - params[2]),
+                             params[3] * (1 - params[4]),
+                             params[5] * (1 - params[6]))
 
             ax.plot(x, y1, label='Positive')
             ax.plot(x, y2, label='Negative')
@@ -346,13 +347,13 @@ class Tools():
         elif pdf_type in ('ExponNorm Positive', 'ExponNorm Negative'):
             x = np.linspace(-1, 1, 200)
             if pdf_type == 'ExponNorm Negative':
-                y = cls.expnorm(1+x, 1-params[0], params[1], params[2],
+                y = cls.expnorm(1 + x, 1 - params[0], params[1], params[2],
                                 params[3])
             else:
-                y = cls.expnorm(1-x, 1-params[0], params[1], params[2],
+                y = cls.expnorm(1 - x, 1 - params[0], params[1], params[2],
                                 params[3])
             ax.plot(x, y, label=pdf_type)
-            
+
         ax.legend(loc='best')
 
     @classmethod
@@ -429,13 +430,15 @@ class Tools():
 
         if pdf_type == 'Bimodal':
             # params: mu, sigma, ds, A, dA
-            par0 = [mu, 0.05, 0.5, A, 0.5]
+            if A > 3.0:
+                A = 2.8
+            par0 = [mu, 0.15, 0.5, A, 0.5]
             if -0.1 < mu < 0.1:
-                mins = [0, 0.01, 0.45, 0.0000, 0.45]
-                maxs = [1, 0.80, 0.55, np.inf, 0.55]
+                mins = [0, 0.10, 0.45, 0.0, 0.45]
+                maxs = [1, 0.80, 0.55, 3.0, 0.55]
             elif -0.3 < mu < 0.3:
-                mins = [0, 0.01, 0.35, 0.0000, 0.35]
-                maxs = [1, 0.60, 0.65, np.inf, 0.65]
+                mins = [0, 0.10, 0.35, 0.0, 0.35]
+                maxs = [1, 0.60, 0.65, 3.0, 0.65]
             elif -0.5 < mu < 0.5:
                 mins = [0, 0.01, 0.20, 0.0000, 0.20]
                 maxs = [1, 0.30, 0.80, np.inf, 0.80]
@@ -445,7 +448,7 @@ class Tools():
             bounds = (mins, maxs)
             params, cov = curve_fit(cls.bimodal_gauss, x, y,
                                     par0, bounds=bounds)
-            
+
         elif pdf_type == 'Positive':
             # params: mu, sigma, A
             par0 = [mu, 0.10,      A]
@@ -477,8 +480,8 @@ class Tools():
         if pdf_type == 'Bimodal':
             # params: mu, sigma1, sigma2, lamb1, lamb2, A, dA
             p0 = np.asarray(preparams)
-            pmax = p0 * 1.2
-            pmin = p0 * 0.8
+            pmax = p0 * 1.3
+            pmin = p0 * 0.7
             p0 = p0.tolist()
             pmax = pmax.tolist()
             pmin = pmin.tolist()
@@ -487,29 +490,40 @@ class Tools():
             _mu_, _s_, _ds_, _A_, _dA_ = p0
             __mu, __s, __ds, __A, __dA = pmax
 
-            l1__ = 1.0
-            _l1_ = 20.0
-            __l1 = 60.0
-            l2__ = 1.0
-            _l2_ = 20.0
-            __l2 = 60.0
+            if(mu__ < 0):
+                mu__ = 0
+            if(__mu > 1):
+                __mu = 1
 
-            mins = [mu__, s__, ds__, l1__, l2__, A__, dA__]
-            par0 = [_mu_, _s_, _ds_, _l1_, _l2_, _A_, _dA_]
-            maxs = [__mu, __s, __ds, __l1, __l2, __A, __dA]
+            if -0.1 < _mu_ < 0.1:
+                l__, _l_, __l = 2.0, 40.0, 160.0
+                dl__, _dl_, __dl = 0.45, 0.50, 0.55
+            elif -0.3 < _mu_ < 0.3:
+                l__, _l_, __l = 2.0, 40.0, 160.0
+                dl__, _dl_, __dl = 0.40, 0.50, 0.60
+            elif -0.5 < _mu_ < 0.5:
+                l__, _l_, __l = 2.0, 40.0, 160.0
+                dl__, _dl_, __dl = 0.35, 0.50, 0.65
+            else:
+                l__, _l_, __l = 2.0, 40.0, 160.0
+                dl__, _dl_, __dl = 0.20, 0.5, 0.80
+
+            mins = [mu__, s__, ds__, l__, dl__, A__, dA__]
+            par0 = [_mu_, _s_, _ds_, _l_, _dl_, _A_, _dA_]
+            maxs = [__mu, __s, __ds, __l, __dl, __A, __dA]
             bounds = (mins, maxs)
             params, cov = curve_fit(cls.bimodal_expnorm, x, y, par0,
                                     bounds=bounds)
 
-        elif pdf_type in ('Positive','Negative'):
+        elif pdf_type in ('Positive', 'Negative'):
             # params: mu, sigma, lamb, A
 
             p0 = np.asarray(preparams)
             if pdf_type == 'Positive':
-                p0[0] = 1-p0[0]
+                p0[0] = 1 - p0[0]
             else:
-                p0[0] = 1+p0[0]
-                
+                p0[0] = 1 + p0[0]
+
             pmax = p0 * 1.2
             pmin = p0 * 0.8
             p0 = p0.tolist()
@@ -529,10 +543,10 @@ class Tools():
             maxs = [__mu, __s1, __l, __A]
             bounds = (mins, maxs)
             if pdf_type == 'Negative':
-                params, cov = curve_fit(cls.expnorm, 1+x, y, par0,
+                params, cov = curve_fit(cls.expnorm, 1 + x, y, par0,
                                         bounds=bounds)
             else:
-                params, cov = curve_fit(cls.expnorm, 1-x, y, par0,
+                params, cov = curve_fit(cls.expnorm, 1 - x, y, par0,
                                         bounds=bounds)
 
             params[0] = 1 - params[0]
@@ -543,26 +557,42 @@ class Tools():
 
     @classmethod
     def interpret(cls, pdf_type, params, sigmas):
+        x = np.linspace(-1, 1, 1000)
         if pdf_type == 'ExponNorm Bimodal':
-            mu, sigma, ds, lamb1, lamb2, A, dA = params
-            mean1 = mu + 1/lamb1
-            mean2 = mu + 1/lamb2
-            sd1 = np.sqrt(sigma*ds + (1/lamb1**2))
-            sd2 = np.sqrt(sigma*(1-ds) + (1/lamb2**2))
-            return [mean1, sd1, dA], [-mean2, sd2, 1-dA]
+            mu, sigma, ds, lamb, dl, A, dA = params
+
+            expnorm1 = cls.expnorm(1 - x, 1 - mu, sigma * ds,
+                                   lamb * dl, A * dA)
+            expnorm2 = cls.expnorm(1 + x, 1 - mu, sigma * (1 - ds),
+                                   lamb * (1 - dl), A * (1 - dA))
+
+            mode1 = x[np.argmax(expnorm1)]
+            mode2 = x[np.argmax(expnorm2)]
+            mean1 = mu + 1 / (lamb * dl)
+            mean2 = mu + 1 / (lamb * (1 - dl))
+            sd1 = np.sqrt(sigma * ds + (1 / (lamb * dl)**2)) / 2
+            sd2 = np.sqrt(sigma * (1 - ds) + (1 / (lamb * (1 - dl))**2)) / 2
+            return [mode1, sd1, dA], [mode2, sd2, 1 - dA]
 
         elif pdf_type in ('ExponNorm Positive', 'ExponNorm Negative'):
             mu, sigma, lamb, A = params
-            mean = abs(mu) + 1/lamb
-            sd = np.sqrt(sigma + (1/lamb**2))
+
             if pdf_type == 'ExponNorm Positive':
-                return [+mean, sd, 1.0], [0.0, 1.0, 0.0]
+                expnorm = cls.expnorm(1 - x, 1 - mu, sigma, lamb, A)
             else:
-                return [0.0, 1.0, 0.0], [-mean, sd, 1.0]
+                expnorm = cls.expnorm(1 + x, 1 - mu, sigma, lamb, A)
+
+            mode = x[np.argmax(expnorm)]
+            mean = abs(mu) + 1 / lamb
+            sd = np.sqrt(sigma + (1 / lamb**2)) / 2
+            if pdf_type == 'ExponNorm Positive':
+                return [mode, sd, 1.0], [0.0, 1.0, 0.0]
+            else:
+                return [0.0, 1.0, 0.0], [mode, sd, 1.0]
 
         elif pdf_type == 'Norm Bimodal':
             mu, sigma, ds, A, dA = params
-            return [mu, sigma*ds, A*dA], [-mu, sigma*(1-ds), A*(1-dA)]
+            return [mu, sigma * ds, A * dA], [-mu, sigma * (1 - ds), A * (1 - dA)]
         elif pdf_type in ('Norm Positive', 'Norm Negative'):
             mu, sigma, A = params
             mean = abs(mu)
@@ -570,8 +600,6 @@ class Tools():
             if pdf_type == 'Norm Positive':
                 return [mean, sd, 1.0], [0.0, 1.0, 0.0]
             else:
-                return [0.0, 1.0, 0.0], [-mean, sd, 1.0] 
+                return [0.0, 1.0, 0.0], [-mean, sd, 1.0]
         else:
             raise ValueError
-
-    

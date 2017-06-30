@@ -14,8 +14,10 @@ import matplotlib.pyplot as plt
 from ising import Sample, State, Simulation
 from tools import Tools
 
+
 class FitError(Exception):
     """Exception for error during fit process"""
+
 
 class Analysis():
 
@@ -124,7 +126,7 @@ class Analysis():
         m_neg = np.asarray(m_neg)
         sd_neg = np.asarray(sd_neg)
         a_neg = np.asarray(a_neg)
-                                                
+
         return m_pos, sd_pos, a_pos, m_neg, sd_neg, a_neg
 
     @property
@@ -135,7 +137,7 @@ class Analysis():
                 Ts.append(result.T)
                 Js.append(result.J)
                 Bs.append(result.B)
-            
+
         return np.asarray(Ts), np.asarray(Js), np.asarray(Bs)
 
     @current.setter
@@ -161,11 +163,11 @@ class Analysis():
         mu_m1, sd_m1, a_m1, mu_m2, sd_m2, a_m2 = self.magnet
         for i in range(len(T)):
             if a_m1[i] > 0:
-                ax.errorbar(T[i], mu_m1[i], yerr=sd_m1[i]/2,
-                            color='b', marker='o', markersize=a_m1[i]*10)
+                ax.errorbar(T[i], mu_m1[i], yerr=sd_m1[i] / 2,
+                            color='b', marker='o', markersize=a_m1[i] * 10)
             if a_m2[i] > 0:
-                ax.errorbar(T[i], mu_m2[i], yerr=sd_m2[i]/2,
-                            color='r', marker='o', markersize=a_m2[i]*10)
+                ax.errorbar(T[i], mu_m2[i], yerr=sd_m2[i] / 2,
+                            color='r', marker='o', markersize=a_m2[i] * 10)
 
 
 class Result():
@@ -185,7 +187,7 @@ class Result():
         self._sample_size = sample._sample_size
         self._ising_step = sample._step_size
         self._tolerance = sample._tolerance
-        
+
         if Tools.file_exist(self._fullname):
             data = np.load(self._fullname)
             self._cls_params = data[0]
